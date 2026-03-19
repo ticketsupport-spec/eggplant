@@ -87,6 +87,13 @@ $title    = $settings['portal_title'] ?? 'Event Center';
 <main class="eg-main">
   <div class="eg-container">
 
+    <!-- FRONT PAGE INFO -->
+    <?php if ( ! empty( $settings['front_page_info'] ) ) : ?>
+    <div class="eg-front-info">
+      <?php echo wp_kses_post( $settings['front_page_info'] ); ?>
+    </div>
+    <?php endif; ?>
+
     <!-- CALENDAR -->
     <section class="eg-calendar-section">
       <h2 class="eg-section-title"><?php esc_html_e( 'Availability Calendar', 'eggplant' ); ?></h2>

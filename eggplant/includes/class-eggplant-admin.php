@@ -470,6 +470,22 @@ class Eggplant_Admin {
         </div>
 
         <div class="eg-card">
+          <h2><?php esc_html_e( 'Front Page Info', 'eggplant' ); ?></h2>
+          <p class="description"><?php esc_html_e( 'Content displayed above the availability calendar on the front page. HTML is allowed.', 'eggplant' ); ?></p>
+          <?php
+          wp_editor(
+            $settings['front_page_info'],
+            'front_page_info',
+            array(
+              'textarea_name' => 'front_page_info',
+              'textarea_rows' => 8,
+              'media_buttons' => false,
+            )
+          );
+          ?>
+        </div>
+
+        <div class="eg-card">
           <h2><?php esc_html_e( 'Custom CSS', 'eggplant' ); ?></h2>
           <p class="description"><?php esc_html_e( 'Extra CSS appended to the front-end page.', 'eggplant' ); ?></p>
           <textarea name="custom_css" rows="10" class="large-text code"><?php echo esc_textarea( $settings['custom_css'] ); ?></textarea>
@@ -491,6 +507,7 @@ class Eggplant_Admin {
     $data['carousel_autoplay'] = ! empty( $_POST['carousel_autoplay'] ) ? 1 : 0;
     $data['carousel_speed']    = max( 500, intval( $_POST['carousel_speed'] ?? 5000 ) );
     $data['custom_css']        = wp_strip_all_tags( wp_unslash( $_POST['custom_css'] ?? '' ) ); // Admin-only; HTML tags removed; CSS is trusted.
+    $data['front_page_info']   = wp_kses_post( wp_unslash( $_POST['front_page_info'] ?? '' ) );
 
     foreach ( $color_keys as $key ) {
       // Color picker sends hex value; text field is the editable version.

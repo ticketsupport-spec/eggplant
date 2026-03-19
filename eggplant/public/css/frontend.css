@@ -121,6 +121,33 @@ a:hover { text-decoration: underline; }
 .eg-carousel__dot--active,
 .eg-carousel__dot:hover { background: var(--eg-primary, #e63946); }
 
+/* ── FRONT PAGE INFO ── */
+.eg-front-info {
+  max-width: 700px;
+  margin: 0 auto 2.5rem;
+  background: #1a1a1a;
+  border: 1px solid var(--eg-secondary, #457b9d);
+  border-radius: 8px;
+  padding: 1.5rem 2rem;
+  line-height: 1.7;
+}
+
+.eg-front-info > *:first-child { margin-top: 0; }
+.eg-front-info > *:last-child  { margin-bottom: 0; }
+
+.eg-front-info h1,
+.eg-front-info h2,
+.eg-front-info h3 {
+  color: var(--eg-primary, #e63946);
+  margin-bottom: .5rem;
+}
+
+.eg-front-info p  { margin-bottom: .75rem; }
+.eg-front-info ul,
+.eg-front-info ol { padding-left: 1.5rem; margin-bottom: .75rem; }
+.eg-front-info a  { color: var(--eg-secondary, #457b9d); }
+.eg-front-info a:hover { text-decoration: underline; }
+
 /* ── MAIN ── */
 .eg-main { padding: 3rem 0 4rem; }
 
