@@ -16,6 +16,7 @@ if (!defined('WPINC')) {
 }
 
 define('EGGPLANT_VERSION', '1.0.0');
+define('EGGPLANT_DB_VERSION', '1.0.0');
 define('EGGPLANT_PLUGIN_FILE', __FILE__);
 define('EGGPLANT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('EGGPLANT_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -23,9 +24,9 @@ define('EGGPLANT_PLUGIN_BASENAME', plugin_basename(__FILE__));
 
 require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant.php';
 
-function eggplant_activate(): void {
+function eggplant_activate( bool $network_wide = false ): void {
   require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-activator.php';
-  Eggplant_Activator::activate();
+  Eggplant_Activator::activate( $network_wide );
 }
 
 function eggplant_deactivate(): void {

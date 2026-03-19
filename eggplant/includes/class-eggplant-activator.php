@@ -12,15 +12,38 @@ class Eggplant_Activator {
   /**
    * Runs on plugin activation: creates DB tables and default settings.
    *
+   * Supports multisite network activation: when $network_wide is true the
+   * tables are created for every site in the network.
+   *
    * @since 1.0.0
+   * @param bool $network_wide Whether the plugin is being activated network-wide.
    */
-  public static function activate(): void {
-    self::create_tables();
-    self::set_default_settings();
+  public static function activate( bool $network_wide = false ): void {
+    if ( $network_wide && function_exists( 'is_multisite' ) && is_multisite() ) {
+      $sites = get_sites( array( 'fields' => 'ids', 'number' => 0 ) );
+      foreach ( $sites as $blog_id ) {
+        switch_to_blog( $blog_id );
+        self::create_tables();
+        self::set_default_settings();
+        restore_current_blog();
+      }
+    } else {
+      self::create_tables();
+      self::set_default_settings();
+    }
     flush_rewrite_rules();
   }
 
-  private static function create_tables(): void {
+  /**
+   * Build the SQL statements and run dbDelta for the three plugin tables,
+   * then persist the current DB schema version.
+   *
+   * This method is intentionally public so the DB-migrator can call it
+   * without duplicating the schema definitions.
+   *
+   * @since 1.0.0
+   */
+  public static function create_tables(): void {
     global $wpdb;
     $charset_collate = $wpdb->get_charset_collate();
 
@@ -73,10 +96,19 @@ class Eggplant_Activator {
 
     require_once ABSPATH . 'wp-admin/includes/upgrade.php';
     dbDelta( $sql_slots );
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
+      error_log( 'Eggplant dbDelta error (eggplant_time_slots): ' . $wpdb->last_error );
+    }
     dbDelta( $sql_events );
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
+      error_log( 'Eggplant dbDelta error (eggplant_events): ' . $wpdb->last_error );
+    }
     dbDelta( $sql_bookings );
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
+      error_log( 'Eggplant dbDelta error (eggplant_bookings): ' . $wpdb->last_error );
+    }
 
-    update_option( 'eggplant_db_version', '1.0.0' );
+    update_option( 'eggplant_db_version', EGGPLANT_DB_VERSION );
   }
 
   private static function set_default_settings(): void {
