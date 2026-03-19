@@ -1,0 +1,105 @@
+/*
+ * Eggplant Event Portal – Admin styles
+ */
+
+.eg-admin { max-width: 1000px; }
+
+/* Dashboard cards */
+.eg-dash-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.2rem;
+  margin-top: 1.5rem;
+}
+
+.eg-dash-card {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .4rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  text-align: center;
+}
+
+.eg-dash-card--alert { border-color: #d63638; background: #fff5f5; }
+
+.eg-dash-number {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #1d2327;
+}
+
+.eg-dash-card--alert .eg-dash-number { color: #d63638; }
+
+.eg-dash-label {
+  font-size: .85rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+/* Card panels */
+.eg-card {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+
+.eg-card h2 { margin-top: 0; font-size: 1.1rem; margin-bottom: 1rem; }
+
+/* Form rows */
+.eg-form-row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin-bottom: .9rem;
+  flex-wrap: wrap;
+}
+
+.eg-form-row label {
+  min-width: 130px;
+  font-weight: 600;
+  font-size: .9rem;
+}
+
+.eg-form-row input[type="text"],
+.eg-form-row input[type="time"],
+.eg-form-row input[type="url"],
+.eg-form-row input[type="number"],
+.eg-form-row select,
+.eg-form-row textarea {
+  flex: 1;
+  min-width: 180px;
+}
+
+/* Messages */
+.eg-msg {
+  margin-left: .75rem;
+  font-size: .9rem;
+  font-style: italic;
+}
+.eg-msg--success { color: #46b450; }
+.eg-msg--error   { color: #d63638; }
+
+/* Slots table */
+.eg-slots-table select { min-width: 110px; }
+.eg-table-wrap { overflow-x: auto; }
+
+/* Bookings table */
+.eg-bookings-table td { vertical-align: top; max-width: 220px; word-wrap: break-word; }
+
+/* Color text inputs */
+.eg-color-text { width: 90px !important; font-family: monospace; }
+
+/* Status badge helpers in booking table */
+.eg-status-new      { color: #d63638; font-weight: 700; }
+.eg-status-reviewed { color: #f0ad00; font-weight: 700; }
+.eg-status-approved { color: #46b450; font-weight: 700; }
+.eg-status-declined { color: #555;    font-weight: 700; text-decoration: line-through; }
