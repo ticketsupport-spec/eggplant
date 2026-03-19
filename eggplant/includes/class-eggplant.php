@@ -12,5 +12,13 @@
  */
 
 class Eggplant {
-    // Add your core plugin functionality here
+
+  /**
+   * Runs the plugin.
+   *
+   * @since 1.0.0
+   */
+  public function run(): void {
+  }
+
 }
