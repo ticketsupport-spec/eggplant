@@ -27,6 +27,7 @@ class Eggplant_Settings {
       'carousel_speed'    => 5000,
       'carousel_autoplay' => 1,
       'custom_css'        => '',
+      'front_page_info'   => '',
       'contact_email'     => get_option( 'admin_email' ),
       'show_booking_form' => 1,
     );
