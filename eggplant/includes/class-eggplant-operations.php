@@ -226,9 +226,10 @@ class Eggplant_Operations {
    * Render the staff clock shortcode.
    */
   public static function render_staff_clock_shortcode(): string {
-    $message = self::get_request_message();
+    $message                  = self::get_request_message();
     $primary_button_class   = is_admin() ? 'button button-primary' : 'eg-btn eg-btn--primary';
     $secondary_button_class = is_admin() ? 'button' : 'eg-btn';
+    $staff_members            = class_exists( 'Eggplant_Payroll' ) ? Eggplant_Payroll::get_active_staff() : array();
 
     ob_start();
     ?>
@@ -245,7 +246,14 @@ class Eggplant_Operations {
 
         <div class="eg-form-row">
           <label for="eg-staff-identifier"><?php esc_html_e( 'Staff member', 'eggplant' ); ?></label>
-          <input type="text" id="eg-staff-identifier" name="staff_identifier" required placeholder="<?php esc_attr_e( 'Enter your name or staff ID', 'eggplant' ); ?>">
+          <input type="text" id="eg-staff-identifier" name="staff_identifier" list="eg-staff-directory" required placeholder="<?php esc_attr_e( 'Enter your name or staff ID', 'eggplant' ); ?>">
+          <?php if ( ! empty( $staff_members ) ) : ?>
+            <datalist id="eg-staff-directory">
+              <?php foreach ( $staff_members as $staff_member ) : ?>
+                <option value="<?php echo esc_attr( $staff_member['staff_identifier'] ); ?>"><?php echo esc_html( $staff_member['full_name'] ); ?></option>
+              <?php endforeach; ?>
+            </datalist>
+          <?php endif; ?>
         </div>
 
         <div class="eg-form-row">
@@ -353,8 +361,10 @@ class Eggplant_Operations {
       $entry_id = Eggplant_DB::check_out_staff( $staff_identifier );
       $message  = $entry_id ? __( 'Staff member checked out.', 'eggplant' ) : __( 'No open clock entry was found for that staff member.', 'eggplant' );
     } else {
+      $staff = class_exists( 'Eggplant_Payroll' ) ? Eggplant_Payroll::find_staff_by_identifier( $staff_identifier ) : null;
       $entry_id = Eggplant_DB::check_in_staff(
         array(
+          'staff_id'         => $staff['id'] ?? 0,
           'staff_identifier' => $staff_identifier,
           'notes'            => $notes,
         )

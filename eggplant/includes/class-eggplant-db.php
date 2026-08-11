@@ -472,10 +472,11 @@ class Eggplant_DB {
     $result = $wpdb->insert(
       $wpdb->prefix . 'eggplant_staff_checkins',
       array(
+        'staff_id'         => ! empty( $data['staff_id'] ) ? intval( $data['staff_id'] ) : null,
         'staff_identifier' => $staff_identifier,
         'notes'            => sanitize_text_field( $data['notes'] ?? '' ),
       ),
-      array( '%s', '%s' )
+      array( '%d', '%s', '%s' )
     );
 
     return $result ? $wpdb->insert_id : false;

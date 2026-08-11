@@ -25,7 +25,10 @@ class Eggplant_DB_Migrator {
     'eggplant_bookings',
     'eggplant_tasks',
     'eggplant_task_completions',
+    'eggplant_staff',
     'eggplant_staff_checkins',
+    'eggplant_payroll_periods',
+    'eggplant_payroll_entries',
   );
 
   /**
