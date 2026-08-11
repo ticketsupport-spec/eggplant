@@ -903,26 +903,29 @@ class Eggplant_Payroll {
         <tbody>
           <?php foreach ( $entries as $entry ) : ?>
             <?php $is_open = empty( $entry['clock_out_at'] ) || '0000-00-00 00:00:00' === $entry['clock_out_at']; ?>
+            <?php $form_id = 'eg-entry-' . intval( $entry['id'] ); ?>
             <tr class="<?php echo esc_attr( $is_open ? 'eg-row--active' : '' ); ?>">
               <?php if ( $show_actions ) : ?>
-                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-                  <input type="hidden" name="action" value="eggplant_update_staff_entry">
-                  <input type="hidden" name="entry_id" value="<?php echo esc_attr( $entry['id'] ); ?>">
-                  <?php wp_nonce_field( 'eggplant_update_staff_entry_' . $entry['id'], 'eggplant_update_staff_entry_nonce' ); ?>
-                  <td>
-                    <input type="text" name="staff_identifier" value="<?php echo esc_attr( $entry['staff_identifier'] ); ?>">
-                    <?php if ( ! empty( $entry['full_name'] ) ) : ?>
-                      <p class="description"><?php echo esc_html( $entry['full_name'] ); ?></p>
-                    <?php endif; ?>
-                  </td>
-                  <td><input type="datetime-local" name="clock_in_at" value="<?php echo esc_attr( self::format_datetime_input( $entry['clock_in_at'] ) ); ?>"></td>
-                  <td><input type="datetime-local" name="clock_out_at" value="<?php echo esc_attr( self::format_datetime_input( $entry['clock_out_at'] ) ); ?>"></td>
-                  <td><input type="text" name="notes" value="<?php echo esc_attr( $entry['notes'] ); ?>"></td>
-                  <td>
-                    <label><input type="checkbox" name="approved" value="1" <?php checked( ! empty( $entry['approved_at'] ) ); ?>> <?php echo esc_html( $is_open ? __( 'Open', 'eggplant' ) : __( 'Closed', 'eggplant' ) ); ?></label>
-                  </td>
-                  <td><button type="submit" class="button"><?php esc_html_e( 'Save', 'eggplant' ); ?></button></td>
-                </form>
+                <td>
+                  <input type="text" name="staff_identifier" form="<?php echo esc_attr( $form_id ); ?>" value="<?php echo esc_attr( $entry['staff_identifier'] ); ?>">
+                  <?php if ( ! empty( $entry['full_name'] ) ) : ?>
+                    <p class="description"><?php echo esc_html( $entry['full_name'] ); ?></p>
+                  <?php endif; ?>
+                </td>
+                <td><input type="datetime-local" name="clock_in_at" form="<?php echo esc_attr( $form_id ); ?>" value="<?php echo esc_attr( self::format_datetime_input( $entry['clock_in_at'] ) ); ?>"></td>
+                <td><input type="datetime-local" name="clock_out_at" form="<?php echo esc_attr( $form_id ); ?>" value="<?php echo esc_attr( self::format_datetime_input( $entry['clock_out_at'] ) ); ?>"></td>
+                <td><input type="text" name="notes" form="<?php echo esc_attr( $form_id ); ?>" value="<?php echo esc_attr( $entry['notes'] ); ?>"></td>
+                <td>
+                  <label><input type="checkbox" name="approved" form="<?php echo esc_attr( $form_id ); ?>" value="1" <?php checked( ! empty( $entry['approved_at'] ) ); ?>> <?php echo esc_html( $is_open ? __( 'Open', 'eggplant' ) : __( 'Closed', 'eggplant' ) ); ?></label>
+                </td>
+                <td>
+                  <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" id="<?php echo esc_attr( $form_id ); ?>">
+                    <input type="hidden" name="action" value="eggplant_update_staff_entry">
+                    <input type="hidden" name="entry_id" value="<?php echo esc_attr( $entry['id'] ); ?>">
+                    <?php wp_nonce_field( 'eggplant_update_staff_entry_' . $entry['id'], 'eggplant_update_staff_entry_nonce' ); ?>
+                    <button type="submit" class="button"><?php esc_html_e( 'Save', 'eggplant' ); ?></button>
+                  </form>
+                </td>
               <?php else : ?>
                 <td><?php echo esc_html( $entry['staff_identifier'] ); ?></td>
                 <td><?php echo esc_html( Eggplant_Operations::format_datetime( $entry['clock_in_at'] ) ); ?></td>
@@ -1098,7 +1101,7 @@ class Eggplant_Payroll {
    */
   private static function calculate_payroll_totals( array $staff, array $summary, array $settings, array $period ): array {
     $year               = intval( substr( (string) $period['pay_date'], 0, 4 ) );
-    $year_to_date       = self::get_year_to_date_contributions( intval( $staff['id'] ), $year, intval( $period['id'] ) );
+    $year_to_date       = self::get_year_to_date_contributions( intval( $staff['id'] ), $year, intval( $period['id'] ), $period );
     $hourly_wage        = floatval( $staff['hourly_wage'] ?? 0 );
     $regular_hours      = floatval( $summary['regular_hours'] ?? 0 );
     $overtime_hours     = floatval( $summary['overtime_hours'] ?? 0 );
@@ -1144,7 +1147,7 @@ class Eggplant_Payroll {
    *
    * @return array<string,float>
    */
-  private static function get_year_to_date_contributions( int $staff_id, int $year, int $period_id ): array {
+  private static function get_year_to_date_contributions( int $staff_id, int $year, int $period_id, array $period = array() ): array {
     global $wpdb;
 
     $row = $wpdb->get_row(
@@ -1156,9 +1159,11 @@ class Eggplant_Payroll {
           INNER JOIN {$wpdb->prefix}eggplant_payroll_periods p ON p.id = e.payroll_period_id
           WHERE e.staff_id = %d
             AND YEAR(p.pay_date) = %d
+            AND p.pay_date < %s
             AND p.id <> %d",
         $staff_id,
         $year,
+        sanitize_text_field( $period['pay_date'] ?? '' ),
         $period_id
       ),
       ARRAY_A
@@ -1356,12 +1361,13 @@ class Eggplant_Payroll {
       return null;
     }
 
-    $timestamp = strtotime( str_replace( 'T', ' ', $value ) );
-    if ( false === $timestamp ) {
+    try {
+      $datetime = new DateTimeImmutable( str_replace( 'T', ' ', $value ), function_exists( 'wp_timezone' ) ? wp_timezone() : new DateTimeZone( 'UTC' ) );
+    } catch ( Exception $e ) {
       return null;
     }
 
-    return gmdate( 'Y-m-d H:i:s', $timestamp );
+    return $datetime->format( 'Y-m-d H:i:s' );
   }
 
   /**
@@ -1373,7 +1379,7 @@ class Eggplant_Payroll {
     }
 
     $timestamp = strtotime( $datetime );
-    return false === $timestamp ? '' : gmdate( 'Y-m-d\TH:i', $timestamp );
+    return false === $timestamp ? '' : wp_date( 'Y-m-d\TH:i', $timestamp );
   }
 
   /**
