@@ -35,7 +35,7 @@ class Eggplant_Activator {
   }
 
   /**
-   * Build the SQL statements and run dbDelta for the three plugin tables,
+   * Build the SQL statements and run dbDelta for the plugin tables,
    * then persist the current DB schema version.
    *
    * This method is intentionally public so the DB-migrator can call it
@@ -94,6 +94,49 @@ class Eggplant_Activator {
       KEY event_date (event_date)
     ) $charset_collate;";
 
+    // Recurring operational tasks table.
+    $sql_tasks = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}eggplant_tasks (
+      id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      task_name         VARCHAR(255) NOT NULL DEFAULT '',
+      interval_type     VARCHAR(20) NOT NULL DEFAULT 'hours',
+      interval_value    INT UNSIGNED NOT NULL DEFAULT 1,
+      last_completed_at DATETIME NULL,
+      next_due_at       DATETIME NULL,
+      active            TINYINT(1) NOT NULL DEFAULT 1,
+      created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY active (active),
+      KEY next_due_at (next_due_at)
+    ) $charset_collate;";
+
+    // Task completion history for attendance / audit tracking.
+    $sql_task_completions = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}eggplant_task_completions (
+      id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      task_id           BIGINT UNSIGNED NOT NULL,
+      staff_identifier  VARCHAR(200) DEFAULT '',
+      completed_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY task_id (task_id),
+      KEY completed_at (completed_at)
+    ) $charset_collate;";
+
+    // Staff clock entries.
+    $sql_staff_checkins = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}eggplant_staff_checkins (
+      id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      staff_identifier  VARCHAR(200) NOT NULL DEFAULT '',
+      clock_in_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      clock_out_at      DATETIME NULL,
+      notes             TEXT,
+      created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY staff_identifier (staff_identifier),
+      KEY clock_in_at (clock_in_at),
+      KEY clock_out_at (clock_out_at)
+    ) $charset_collate;";
+
     require_once ABSPATH . 'wp-admin/includes/upgrade.php';
     dbDelta( $sql_slots );
     if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
@@ -106,6 +149,18 @@ class Eggplant_Activator {
     dbDelta( $sql_bookings );
     if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
       error_log( 'Eggplant dbDelta error (eggplant_bookings): ' . $wpdb->last_error );
+    }
+    dbDelta( $sql_tasks );
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
+      error_log( 'Eggplant dbDelta error (eggplant_tasks): ' . $wpdb->last_error );
+    }
+    dbDelta( $sql_task_completions );
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
+      error_log( 'Eggplant dbDelta error (eggplant_task_completions): ' . $wpdb->last_error );
+    }
+    dbDelta( $sql_staff_checkins );
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
+      error_log( 'Eggplant dbDelta error (eggplant_staff_checkins): ' . $wpdb->last_error );
     }
 
     update_option( 'eggplant_db_version', EGGPLANT_DB_VERSION );
@@ -125,6 +180,7 @@ class Eggplant_Activator {
       'carousel_autoplay'    => 1,
       'custom_css'           => '',
       'contact_email'        => get_option( 'admin_email' ),
+      'front_page_info'      => '',
       'show_booking_form'    => 1,
     );
     if ( ! get_option( 'eggplant_settings' ) ) {

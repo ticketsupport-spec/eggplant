@@ -25,12 +25,14 @@ class Eggplant {
     require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-settings.php';
     require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-db.php';
     require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-db-migrator.php';
+    require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-operations.php';
     require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-frontend.php';
     require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-admin.php';
   }
 
   private function init_features(): void {
     Eggplant_DB_Migrator::init();
+    Eggplant_Operations::init();
 
     new Eggplant_Frontend();
 

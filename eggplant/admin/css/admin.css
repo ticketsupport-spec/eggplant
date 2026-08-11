@@ -103,3 +103,63 @@
 .eg-status-reviewed { color: #f0ad00; font-weight: 700; }
 .eg-status-approved { color: #46b450; font-weight: 700; }
 .eg-status-declined { color: #555;    font-weight: 700; text-decoration: line-through; }
+
+/* Operational tasks / staff clock */
+.eg-operations-table .eg-inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  align-items: center;
+}
+
+.eg-operations-table .eg-inline-form input[type="text"] {
+  min-width: 130px;
+}
+
+.eg-row--overdue td {
+  background: #fff5f5;
+}
+
+.eg-row--active td {
+  background: #f0fff4;
+}
+
+.eg-task-status {
+  display: inline-block;
+  padding: .2rem .45rem;
+  border-radius: 999px;
+  background: #edf7ed;
+  color: #1e6b34;
+  font-weight: 600;
+}
+
+.eg-task-status--overdue {
+  background: #fff1f0;
+  color: #b42318;
+}
+
+.eg-task-status--muted {
+  background: #f6f7f7;
+  color: #50575e;
+}
+
+.eg-admin .eg-ops {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.eg-admin .eg-ops-message {
+  margin-bottom: 1rem;
+  padding: .75rem 1rem;
+  border-left: 4px solid #2271b1;
+  background: #f0f6fc;
+}
+
+.eg-admin .eg-ops-clock-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+}

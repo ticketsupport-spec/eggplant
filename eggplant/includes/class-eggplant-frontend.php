@@ -60,10 +60,10 @@ class Eggplant_Frontend {
   }
 
   /**
-   * Enqueue CSS & JS only on the front page.
+   * Enqueue CSS & JS on plugin-controlled front-end views and shortcodes.
    */
   public function enqueue_assets(): void {
-    if ( ! is_front_page() && ! is_home() ) {
+    if ( ! $this->should_enqueue_assets() ) {
       return;
     }
 
@@ -95,6 +95,26 @@ class Eggplant_Frontend {
       'carouselAuto'    => ! empty( $settings['carousel_autoplay'] ),
       'showBookingForm' => ! empty( $settings['show_booking_form'] ),
     ) );
+  }
+
+  /**
+   * Determine whether plugin front-end assets are needed on the current page.
+   */
+  private function should_enqueue_assets(): bool {
+    if ( is_front_page() || is_home() ) {
+      return true;
+    }
+
+    if ( ! is_singular() ) {
+      return false;
+    }
+
+    $post = get_post();
+    if ( ! $post || empty( $post->post_content ) ) {
+      return false;
+    }
+
+    return has_shortcode( $post->post_content, 'eggplant_tasks' ) || has_shortcode( $post->post_content, 'eggplant_staff_clock' );
   }
 
   /**
