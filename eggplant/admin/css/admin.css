@@ -163,3 +163,19 @@
   flex-wrap: wrap;
   gap: .75rem;
 }
+
+.eg-payroll-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.eg-admin table input[type="text"],
+.eg-admin table input[type="datetime-local"] {
+  width: 100%;
+}
+
+.eg-admin .description {
+  margin-top: .35rem;
+}

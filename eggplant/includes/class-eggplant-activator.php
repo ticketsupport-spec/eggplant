@@ -122,19 +122,80 @@ class Eggplant_Activator {
       KEY completed_at (completed_at)
     ) $charset_collate;";
 
+    // Staff directory.
+    $sql_staff = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}eggplant_staff (
+      id                   BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      staff_identifier     VARCHAR(200) NOT NULL DEFAULT '',
+      full_name            VARCHAR(200) NOT NULL DEFAULT '',
+      email                VARCHAR(200) DEFAULT '',
+      hire_date            DATE NULL,
+      hourly_wage          DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      overtime_multiplier  DECIMAL(5,2) NOT NULL DEFAULT 1.50,
+      status               VARCHAR(20) NOT NULL DEFAULT 'active',
+      created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY staff_identifier (staff_identifier),
+      KEY status (status)
+    ) $charset_collate;";
+
     // Staff clock entries.
     $sql_staff_checkins = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}eggplant_staff_checkins (
       id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      staff_id          BIGINT UNSIGNED NULL,
       staff_identifier  VARCHAR(200) NOT NULL DEFAULT '',
       clock_in_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       clock_out_at      DATETIME NULL,
       notes             TEXT,
+      approved_at       DATETIME NULL,
+      approved_by       BIGINT UNSIGNED NULL,
       created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       PRIMARY KEY (id),
+      KEY staff_id (staff_id),
       KEY staff_identifier (staff_identifier),
       KEY clock_in_at (clock_in_at),
-      KEY clock_out_at (clock_out_at)
+      KEY clock_out_at (clock_out_at),
+      KEY approved_at (approved_at)
+    ) $charset_collate;";
+
+    // Payroll periods.
+    $sql_payroll_periods = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}eggplant_payroll_periods (
+      id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      period_start  DATE NOT NULL,
+      period_end    DATE NOT NULL,
+      pay_date      DATE NOT NULL,
+      status        VARCHAR(20) NOT NULL DEFAULT 'draft',
+      notes         TEXT,
+      created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY period_start (period_start),
+      KEY pay_date (pay_date),
+      KEY status (status)
+    ) $charset_collate;";
+
+    // Payroll entries.
+    $sql_payroll_entries = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}eggplant_payroll_entries (
+      id                 BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      payroll_period_id  BIGINT UNSIGNED NOT NULL,
+      staff_id           BIGINT UNSIGNED NOT NULL,
+      regular_hours      DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      overtime_hours     DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      hourly_wage        DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      gross_pay          DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      vacation_pay       DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      income_tax         DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      cpp_employee       DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      ei_employee        DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      other_deductions   DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      net_pay            DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      deduction_summary  LONGTEXT NULL,
+      created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY payroll_period_staff (payroll_period_id, staff_id),
+      KEY staff_id (staff_id)
     ) $charset_collate;";
 
     require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -158,15 +219,29 @@ class Eggplant_Activator {
     if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
       error_log( 'Eggplant dbDelta error (eggplant_task_completions): ' . $wpdb->last_error );
     }
+    dbDelta( $sql_staff );
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
+      error_log( 'Eggplant dbDelta error (eggplant_staff): ' . $wpdb->last_error );
+    }
     dbDelta( $sql_staff_checkins );
     if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
       error_log( 'Eggplant dbDelta error (eggplant_staff_checkins): ' . $wpdb->last_error );
+    }
+    dbDelta( $sql_payroll_periods );
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
+      error_log( 'Eggplant dbDelta error (eggplant_payroll_periods): ' . $wpdb->last_error );
+    }
+    dbDelta( $sql_payroll_entries );
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
+      error_log( 'Eggplant dbDelta error (eggplant_payroll_entries): ' . $wpdb->last_error );
     }
 
     update_option( 'eggplant_db_version', EGGPLANT_DB_VERSION );
   }
 
   private static function set_default_settings(): void {
+    require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-payroll.php';
+
     $defaults = array(
       'portal_title'         => 'Event Center',
       'bg_color'             => '#000000',
@@ -185,6 +260,10 @@ class Eggplant_Activator {
     );
     if ( ! get_option( 'eggplant_settings' ) ) {
       add_option( 'eggplant_settings', $defaults );
+    }
+
+    if ( ! get_option( 'eggplant_payroll_settings' ) ) {
+      add_option( 'eggplant_payroll_settings', Eggplant_Payroll::get_settings() );
     }
   }
 

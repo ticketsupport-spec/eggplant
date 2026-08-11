@@ -77,6 +77,24 @@ class Eggplant_Admin {
 
     add_submenu_page(
       'eggplant',
+      __( 'Staff', 'eggplant' ),
+      __( 'Staff', 'eggplant' ),
+      'manage_options',
+      'eggplant-staff',
+      array( 'Eggplant_Payroll', 'render_staff_page' )
+    );
+
+    add_submenu_page(
+      'eggplant',
+      __( 'Payroll', 'eggplant' ),
+      __( 'Payroll', 'eggplant' ),
+      'manage_options',
+      'eggplant-payroll',
+      array( 'Eggplant_Payroll', 'render_payroll_page' )
+    );
+
+    add_submenu_page(
+      'eggplant',
       __( 'Staff Clock', 'eggplant' ),
       __( 'Staff Clock', 'eggplant' ),
       'manage_options',
@@ -103,6 +121,8 @@ class Eggplant_Admin {
       'event-portal_page_eggplant-events',
       'event-portal_page_eggplant-bookings',
       'event-portal_page_eggplant-operations',
+      'event-portal_page_eggplant-staff',
+      'event-portal_page_eggplant-payroll',
       'event-portal_page_eggplant-staff-clock',
       'event-portal_page_eggplant-settings',
     );
@@ -583,7 +603,6 @@ class Eggplant_Admin {
   // ------------------------------------------------------------------ page: staff clock
 
   public function page_staff_clock(): void {
-    $entries = Eggplant_DB::get_recent_staff_checkins( 50 );
     ?>
     <div class="wrap eg-admin">
       <h1><?php esc_html_e( 'Staff Clock', 'eggplant' ); ?></h1>
@@ -598,35 +617,7 @@ class Eggplant_Admin {
 
       <div class="eg-card">
         <h2><?php esc_html_e( 'Recent Entries', 'eggplant' ); ?></h2>
-        <?php if ( empty( $entries ) ) : ?>
-          <p><?php esc_html_e( 'No staff clock entries yet.', 'eggplant' ); ?></p>
-        <?php else : ?>
-          <div class="eg-table-wrap">
-            <table class="widefat striped">
-              <thead>
-                <tr>
-                  <th><?php esc_html_e( 'Staff Member', 'eggplant' ); ?></th>
-                  <th><?php esc_html_e( 'Clock In', 'eggplant' ); ?></th>
-                  <th><?php esc_html_e( 'Clock Out', 'eggplant' ); ?></th>
-                  <th><?php esc_html_e( 'Notes', 'eggplant' ); ?></th>
-                  <th><?php esc_html_e( 'Status', 'eggplant' ); ?></th>
-                </tr>
-              </thead>
-              <tbody>
-                <?php foreach ( $entries as $entry ) : ?>
-                  <?php $is_open = empty( $entry['clock_out_at'] ) || '0000-00-00 00:00:00' === $entry['clock_out_at']; ?>
-                  <tr class="<?php echo $is_open ? 'eg-row--active' : ''; ?>">
-                    <td><?php echo esc_html( $entry['staff_identifier'] ); ?></td>
-                    <td><?php echo esc_html( Eggplant_Operations::format_datetime( $entry['clock_in_at'] ) ); ?></td>
-                    <td><?php echo esc_html( $is_open ? __( 'Still checked in', 'eggplant' ) : Eggplant_Operations::format_datetime( $entry['clock_out_at'] ) ); ?></td>
-                    <td><?php echo esc_html( $entry['notes'] ); ?></td>
-                    <td><span class="eg-task-status <?php echo $is_open ? '' : 'eg-task-status--muted'; ?>"><?php echo esc_html( $is_open ? __( 'Checked In', 'eggplant' ) : __( 'Checked Out', 'eggplant' ) ); ?></span></td>
-                  </tr>
-                <?php endforeach; ?>
-              </tbody>
-            </table>
-          </div>
-        <?php endif; ?>
+        <?php Eggplant_Payroll::render_staff_entry_table( true, 50 ); ?>
       </div>
     </div>
     <?php

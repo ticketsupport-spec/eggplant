@@ -2,6 +2,15 @@
 
 A WordPress plugin that transforms your site into a full-screen event-center portal with a carousel, availability calendar, booking-request form, and a complete admin panel.
 
+## Staff Clock and Payroll
+
+- Use the `[eggplant_staff_clock]` shortcode on any page to show the front-end time clock for staff tablets or kiosks.
+- Add employees in `/wp-admin/admin.php?page=eggplant-staff` with their staff ID, name, hourly wage, and overtime multiplier.
+- Review and edit recent clock entries in `/wp-admin/admin.php?page=eggplant-staff-clock`.
+- Configure payroll settings and process biweekly pay periods in `/wp-admin/admin.php?page=eggplant-payroll`.
+- The payroll screen calculates regular hours, weekly Ontario overtime, gross pay, deductions, net pay, and yearly T4-style totals from processed pay periods.
+- Ontario deduction defaults are editable in the payroll settings screen and should be reviewed each tax year before use.
+
 ## Automatic Database Upgrades
 
 Eggplant manages its own database schema versioning via the `EGGPLANT_DB_VERSION` constant defined in `eggplant.php`.
