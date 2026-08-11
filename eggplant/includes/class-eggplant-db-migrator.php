@@ -15,7 +15,7 @@
 class Eggplant_DB_Migrator {
 
   /**
-   * Names of the three plugin tables (without the $wpdb->prefix).
+   * Names of the plugin tables (without the $wpdb->prefix).
    *
    * @var string[]
    */
@@ -23,6 +23,9 @@ class Eggplant_DB_Migrator {
     'eggplant_time_slots',
     'eggplant_events',
     'eggplant_bookings',
+    'eggplant_tasks',
+    'eggplant_task_completions',
+    'eggplant_staff_checkins',
   );
 
   /**

@@ -68,6 +68,24 @@ class Eggplant_Admin {
 
     add_submenu_page(
       'eggplant',
+      __( 'Operations', 'eggplant' ),
+      __( 'Operations', 'eggplant' ),
+      'manage_options',
+      'eggplant-operations',
+      array( $this, 'page_operations' )
+    );
+
+    add_submenu_page(
+      'eggplant',
+      __( 'Staff Clock', 'eggplant' ),
+      __( 'Staff Clock', 'eggplant' ),
+      'manage_options',
+      'eggplant-staff-clock',
+      array( $this, 'page_staff_clock' )
+    );
+
+    add_submenu_page(
+      'eggplant',
       __( 'Settings', 'eggplant' ),
       __( 'Settings', 'eggplant' ),
       'manage_options',
@@ -84,6 +102,8 @@ class Eggplant_Admin {
       'event-portal_page_eggplant-slots',
       'event-portal_page_eggplant-events',
       'event-portal_page_eggplant-bookings',
+      'event-portal_page_eggplant-operations',
+      'event-portal_page_eggplant-staff-clock',
       'event-portal_page_eggplant-settings',
     );
     if ( ! in_array( $hook, $pages, true ) ) {
@@ -118,6 +138,25 @@ class Eggplant_Admin {
     $new_count = count( array_filter( $bookings, fn( $b ) => $b['status'] === 'new' ) );
     $slots     = Eggplant_DB::get_all_slots();
     $events    = Eggplant_DB::get_all_events();
+    $tasks     = Eggplant_DB::get_active_tasks();
+    $overdue_count = count(
+      array_filter(
+        $tasks,
+        static function ( $task ) {
+          $status = Eggplant_Operations::get_task_status( $task );
+          return ! empty( $status['is_overdue'] );
+        }
+      )
+    );
+    $staff_entries = Eggplant_DB::get_recent_staff_checkins( 100 );
+    $checked_in_count = count(
+      array_filter(
+        $staff_entries,
+        static function ( $entry ) {
+          return empty( $entry['clock_out_at'] ) || '0000-00-00 00:00:00' === $entry['clock_out_at'];
+        }
+      )
+    );
     ?>
     <div class="wrap eg-admin">
       <h1><?php esc_html_e( 'Event Portal – Dashboard', 'eggplant' ); ?></h1>
@@ -136,6 +175,16 @@ class Eggplant_Admin {
           <span class="eg-dash-number"><?php echo $new_count; ?></span>
           <span class="eg-dash-label"><?php esc_html_e( 'New Booking Requests', 'eggplant' ); ?></span>
           <a href="<?php echo esc_url( admin_url( 'admin.php?page=eggplant-bookings' ) ); ?>"><?php esc_html_e( 'View All', 'eggplant' ); ?></a>
+        </div>
+        <div class="eg-dash-card <?php echo $overdue_count ? 'eg-dash-card--alert' : ''; ?>">
+          <span class="eg-dash-number"><?php echo esc_html( $overdue_count ); ?></span>
+          <span class="eg-dash-label"><?php esc_html_e( 'Overdue Tasks', 'eggplant' ); ?></span>
+          <a href="<?php echo esc_url( admin_url( 'admin.php?page=eggplant-operations' ) ); ?>"><?php esc_html_e( 'Manage', 'eggplant' ); ?></a>
+        </div>
+        <div class="eg-dash-card">
+          <span class="eg-dash-number"><?php echo esc_html( $checked_in_count ); ?></span>
+          <span class="eg-dash-label"><?php esc_html_e( 'Staff Checked In', 'eggplant' ); ?></span>
+          <a href="<?php echo esc_url( admin_url( 'admin.php?page=eggplant-staff-clock' ) ); ?>"><?php esc_html_e( 'View Clock', 'eggplant' ); ?></a>
         </div>
       </div>
     </div>
@@ -390,6 +439,195 @@ class Eggplant_Admin {
         </tbody>
       </table>
       <?php endif; ?>
+    </div>
+    <?php
+  }
+
+  // ------------------------------------------------------------------ page: operations
+
+  public function page_operations(): void {
+    $tasks        = Eggplant_DB::get_all_tasks();
+    $edit_task_id = intval( $_GET['task_id'] ?? 0 );
+    $edit_task    = $edit_task_id ? Eggplant_DB::get_task( $edit_task_id ) : null;
+    $message      = isset( $_GET['eggplant_message'] ) ? sanitize_text_field( wp_unslash( $_GET['eggplant_message'] ) ) : '';
+    $intervals    = Eggplant_Operations::get_interval_options();
+    $completions  = Eggplant_DB::get_recent_task_completions( 10 );
+    ?>
+    <div class="wrap eg-admin">
+      <h1><?php esc_html_e( 'Operational Tasks', 'eggplant' ); ?></h1>
+      <?php if ( $message ) : ?>
+        <div class="notice notice-success is-dismissible"><p><?php echo esc_html( $message ); ?></p></div>
+      <?php endif; ?>
+
+      <div class="eg-card" id="eg-operations-form-card">
+        <h2><?php echo $edit_task ? esc_html__( 'Edit Task', 'eggplant' ) : esc_html__( 'Add Task', 'eggplant' ); ?></h2>
+        <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+          <input type="hidden" name="action" value="eggplant_save_task">
+          <input type="hidden" name="task_id" value="<?php echo esc_attr( $edit_task['id'] ?? 0 ); ?>">
+          <?php wp_nonce_field( 'eggplant_save_task', 'eggplant_save_task_nonce' ); ?>
+
+          <div class="eg-form-row">
+            <label for="eg-task-name"><?php esc_html_e( 'Task Name', 'eggplant' ); ?></label>
+            <input type="text" id="eg-task-name" name="task_name" value="<?php echo esc_attr( $edit_task['task_name'] ?? '' ); ?>" required>
+          </div>
+
+          <div class="eg-form-row">
+            <label for="eg-task-interval-type"><?php esc_html_e( 'Interval Type', 'eggplant' ); ?></label>
+            <select id="eg-task-interval-type" name="interval_type">
+              <?php foreach ( $intervals as $value => $label ) : ?>
+                <option value="<?php echo esc_attr( $value ); ?>" <?php selected( $edit_task['interval_type'] ?? 'hours', $value ); ?>><?php echo esc_html( $label ); ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+
+          <div class="eg-form-row">
+            <label for="eg-task-interval-value"><?php esc_html_e( 'Interval Value', 'eggplant' ); ?></label>
+            <input type="number" id="eg-task-interval-value" name="interval_value" value="<?php echo esc_attr( $edit_task['interval_value'] ?? 1 ); ?>" min="1" step="1">
+          </div>
+
+          <div class="eg-form-row">
+            <label for="eg-task-active"><?php esc_html_e( 'Active', 'eggplant' ); ?></label>
+            <input type="checkbox" id="eg-task-active" name="active" value="1" <?php checked( intval( $edit_task['active'] ?? 1 ), 1 ); ?>>
+          </div>
+
+          <div class="eg-form-row">
+            <button type="submit" class="button button-primary"><?php echo $edit_task ? esc_html__( 'Update Task', 'eggplant' ) : esc_html__( 'Add Task', 'eggplant' ); ?></button>
+            <?php if ( $edit_task ) : ?>
+              <a href="<?php echo esc_url( admin_url( 'admin.php?page=eggplant-operations' ) ); ?>" class="button"><?php esc_html_e( 'Cancel', 'eggplant' ); ?></a>
+            <?php endif; ?>
+          </div>
+        </form>
+      </div>
+
+      <div class="eg-card">
+        <h2><?php esc_html_e( 'All Tasks', 'eggplant' ); ?></h2>
+        <?php if ( empty( $tasks ) ) : ?>
+          <p><?php esc_html_e( 'No recurring tasks yet.', 'eggplant' ); ?></p>
+        <?php else : ?>
+          <div class="eg-table-wrap">
+            <table class="widefat striped eg-operations-table">
+              <thead>
+                <tr>
+                  <th><?php esc_html_e( 'Task', 'eggplant' ); ?></th>
+                  <th><?php esc_html_e( 'Interval', 'eggplant' ); ?></th>
+                  <th><?php esc_html_e( 'Last Completed', 'eggplant' ); ?></th>
+                  <th><?php esc_html_e( 'Due', 'eggplant' ); ?></th>
+                  <th><?php esc_html_e( 'Status', 'eggplant' ); ?></th>
+                  <th><?php esc_html_e( 'Actions', 'eggplant' ); ?></th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach ( $tasks as $task ) : ?>
+                  <?php $status = Eggplant_Operations::get_task_status( $task ); ?>
+                  <tr class="<?php echo $status['is_overdue'] ? 'eg-row--overdue' : ''; ?>">
+                    <td>
+                      <strong><?php echo esc_html( $task['task_name'] ); ?></strong>
+                      <?php if ( ! intval( $task['active'] ) ) : ?>
+                        <div class="description"><?php esc_html_e( 'Inactive', 'eggplant' ); ?></div>
+                      <?php endif; ?>
+                    </td>
+                    <td><?php echo esc_html( Eggplant_Operations::get_interval_label( $task ) ); ?></td>
+                    <td><?php echo esc_html( Eggplant_Operations::format_datetime( $status['last_completed_at'] ) ); ?></td>
+                    <td><?php echo esc_html( Eggplant_Operations::format_datetime( $status['next_due_at'] ) ); ?></td>
+                    <td><span class="eg-task-status <?php echo $status['is_overdue'] ? 'eg-task-status--overdue' : ''; ?>"><?php echo esc_html( $status['status_label'] ); ?></span></td>
+                    <td>
+                      <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="eg-inline-form">
+                        <input type="hidden" name="action" value="eggplant_complete_task">
+                        <input type="hidden" name="task_id" value="<?php echo esc_attr( $task['id'] ); ?>">
+                        <input type="hidden" name="redirect_to" value="<?php echo esc_url( admin_url( 'admin.php?page=eggplant-operations' ) ); ?>">
+                        <?php wp_nonce_field( 'eggplant_complete_task_' . $task['id'], 'eggplant_complete_task_nonce' ); ?>
+                        <input type="text" name="staff_identifier" placeholder="<?php esc_attr_e( 'Name or ID', 'eggplant' ); ?>">
+                        <button type="submit" class="button button-primary button-small"><?php esc_html_e( 'Mark Complete', 'eggplant' ); ?></button>
+                        <a href="<?php echo esc_url( Eggplant_Operations::get_admin_tasks_url( intval( $task['id'] ) ) ); ?>" class="button button-small"><?php esc_html_e( 'Edit', 'eggplant' ); ?></a>
+                      </form>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+        <?php endif; ?>
+      </div>
+
+      <div class="eg-card">
+        <h2><?php esc_html_e( 'Recent Task Completions', 'eggplant' ); ?></h2>
+        <?php if ( empty( $completions ) ) : ?>
+          <p><?php esc_html_e( 'No task completions have been recorded yet.', 'eggplant' ); ?></p>
+        <?php else : ?>
+          <div class="eg-table-wrap">
+            <table class="widefat striped">
+              <thead>
+                <tr>
+                  <th><?php esc_html_e( 'Task', 'eggplant' ); ?></th>
+                  <th><?php esc_html_e( 'Completed By', 'eggplant' ); ?></th>
+                  <th><?php esc_html_e( 'Completed At', 'eggplant' ); ?></th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach ( $completions as $completion ) : ?>
+                  <tr>
+                    <td><?php echo esc_html( $completion['task_name'] ); ?></td>
+                    <td><?php echo esc_html( $completion['staff_identifier'] ?: __( 'Not provided', 'eggplant' ) ); ?></td>
+                    <td><?php echo esc_html( Eggplant_Operations::format_datetime( $completion['completed_at'] ) ); ?></td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php
+  }
+
+  // ------------------------------------------------------------------ page: staff clock
+
+  public function page_staff_clock(): void {
+    $entries = Eggplant_DB::get_recent_staff_checkins( 50 );
+    ?>
+    <div class="wrap eg-admin">
+      <h1><?php esc_html_e( 'Staff Clock', 'eggplant' ); ?></h1>
+
+      <div class="eg-card">
+        <h2><?php esc_html_e( 'Clock In / Out', 'eggplant' ); ?></h2>
+        <?php
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- trusted internal shortcode renderer.
+        echo Eggplant_Operations::render_staff_clock_shortcode();
+        ?>
+      </div>
+
+      <div class="eg-card">
+        <h2><?php esc_html_e( 'Recent Entries', 'eggplant' ); ?></h2>
+        <?php if ( empty( $entries ) ) : ?>
+          <p><?php esc_html_e( 'No staff clock entries yet.', 'eggplant' ); ?></p>
+        <?php else : ?>
+          <div class="eg-table-wrap">
+            <table class="widefat striped">
+              <thead>
+                <tr>
+                  <th><?php esc_html_e( 'Staff Member', 'eggplant' ); ?></th>
+                  <th><?php esc_html_e( 'Clock In', 'eggplant' ); ?></th>
+                  <th><?php esc_html_e( 'Clock Out', 'eggplant' ); ?></th>
+                  <th><?php esc_html_e( 'Notes', 'eggplant' ); ?></th>
+                  <th><?php esc_html_e( 'Status', 'eggplant' ); ?></th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach ( $entries as $entry ) : ?>
+                  <?php $is_open = empty( $entry['clock_out_at'] ) || '0000-00-00 00:00:00' === $entry['clock_out_at']; ?>
+                  <tr class="<?php echo $is_open ? 'eg-row--active' : ''; ?>">
+                    <td><?php echo esc_html( $entry['staff_identifier'] ); ?></td>
+                    <td><?php echo esc_html( Eggplant_Operations::format_datetime( $entry['clock_in_at'] ) ); ?></td>
+                    <td><?php echo esc_html( $is_open ? __( 'Still checked in', 'eggplant' ) : Eggplant_Operations::format_datetime( $entry['clock_out_at'] ) ); ?></td>
+                    <td><?php echo esc_html( $entry['notes'] ); ?></td>
+                    <td><span class="eg-task-status <?php echo $is_open ? '' : 'eg-task-status--muted'; ?>"><?php echo esc_html( $is_open ? __( 'Checked In', 'eggplant' ) : __( 'Checked Out', 'eggplant' ) ); ?></span></td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+        <?php endif; ?>
+      </div>
     </div>
     <?php
   }
