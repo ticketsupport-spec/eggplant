@@ -233,6 +233,7 @@ class Eggplant_Activator {
       created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (id),
       UNIQUE KEY order_number (order_number),
+      KEY order_number_access_key (order_number, order_access_key),
       KEY event_id (event_id),
       KEY created_at (created_at)
     ) $charset_collate;";

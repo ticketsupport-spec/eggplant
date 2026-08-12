@@ -651,23 +651,53 @@ class Eggplant_DB {
    */
   public static function insert_discount_code( array $data ) {
     global $wpdb;
+
+    $code = strtoupper( sanitize_text_field( $data['code'] ?? '' ) );
+    if ( '' === $code ) {
+      return false;
+    }
+
+    $base_data = array(
+      'code'           => $code,
+      'discount_type'  => in_array( $data['discount_type'] ?? 'percent', array( 'percent', 'fixed' ), true ) ? $data['discount_type'] : 'percent',
+      'discount_value' => max( 0, floatval( $data['discount_value'] ?? 0 ) ),
+      'max_uses'       => max( 0, intval( $data['max_uses'] ?? 0 ) ),
+      'used_count'     => 0,
+      'active'         => ! empty( $data['active'] ) ? 1 : 0,
+      'start_date'     => sanitize_text_field( $data['start_date'] ?? '' ) ?: null,
+      'end_date'       => sanitize_text_field( $data['end_date'] ?? '' ) ?: null,
+    );
+    $base_formats = array( '%s', '%s', '%f', '%d', '%d', '%d', '%s', '%s' );
+
+    $event_id = intval( $data['event_id'] ?? 0 );
+    if ( $event_id > 0 ) {
+      $base_data['event_id'] = $event_id;
+      $base_formats[] = '%d';
+    }
+
     $result = $wpdb->insert(
       $wpdb->prefix . 'eggplant_discount_codes',
-      array(
-        'code'           => strtoupper( sanitize_text_field( $data['code'] ?? '' ) ),
-        'event_id'       => ! empty( $data['event_id'] ) ? intval( $data['event_id'] ) : null,
-        'discount_type'  => in_array( $data['discount_type'] ?? 'percent', array( 'percent', 'fixed' ), true ) ? $data['discount_type'] : 'percent',
-        'discount_value' => max( 0, floatval( $data['discount_value'] ?? 0 ) ),
-        'max_uses'       => max( 0, intval( $data['max_uses'] ?? 0 ) ),
-        'used_count'     => 0,
-        'active'         => ! empty( $data['active'] ) ? 1 : 0,
-        'start_date'     => sanitize_text_field( $data['start_date'] ?? '' ) ?: null,
-        'end_date'       => sanitize_text_field( $data['end_date'] ?? '' ) ?: null,
-      ),
-      array( '%s', '%d', '%s', '%f', '%d', '%d', '%d', '%s', '%s' )
+      $base_data,
+      $base_formats
     );
 
     return $result ? $wpdb->insert_id : false;
+  }
+
+  /**
+   * Check whether a discount code already exists.
+   */
+  public static function discount_code_exists( string $code ): bool {
+    global $wpdb;
+
+    $existing = $wpdb->get_var(
+      $wpdb->prepare(
+        "SELECT id FROM {$wpdb->prefix}eggplant_discount_codes WHERE code = %s LIMIT 1",
+        strtoupper( sanitize_text_field( $code ) )
+      )
+    );
+
+    return ! empty( $existing );
   }
 
   /**
@@ -1079,20 +1109,28 @@ class Eggplant_DB {
   public static function insert_event_settlement( array $data ) {
     global $wpdb;
 
+    $payload = array(
+      'event_id'          => intval( $data['event_id'] ?? 0 ),
+      'adjustment_amount' => floatval( $data['adjustment_amount'] ?? 0 ),
+      'adjustment_note'   => sanitize_text_field( $data['adjustment_note'] ?? '' ),
+      'created_by'        => ! empty( $data['created_by'] ) ? intval( $data['created_by'] ) : null,
+    );
+    $formats = array( '%d', '%f', '%s', '%d' );
+
+    if ( isset( $data['organizer_split_override'] ) && null !== $data['organizer_split_override'] && '' !== (string) $data['organizer_split_override'] ) {
+      $payload['organizer_split_override'] = floatval( $data['organizer_split_override'] );
+      $formats[] = '%f';
+    }
+
     $result = $wpdb->insert(
       $wpdb->prefix . 'eggplant_event_settlements',
-      array(
-        'event_id'                 => intval( $data['event_id'] ?? 0 ),
-        'adjustment_amount'        => floatval( $data['adjustment_amount'] ?? 0 ),
-        'adjustment_note'          => sanitize_text_field( $data['adjustment_note'] ?? '' ),
-        'organizer_split_override' => isset( $data['organizer_split_override'] ) && null !== $data['organizer_split_override'] ? floatval( $data['organizer_split_override'] ) : null,
-        'created_by'               => ! empty( $data['created_by'] ) ? intval( $data['created_by'] ) : null,
-      ),
-      array( '%d', '%f', '%s', '%f', '%d' )
+      $payload,
+      $formats
     );
 
     return $result ? $wpdb->insert_id : false;
   }
+
 
   /**
    * @return array<int,array<string,mixed>>
@@ -1200,30 +1238,34 @@ class Eggplant_DB {
 
     $rows = $wpdb->get_results(
       // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- internal table names only.
-      "SELECT
-        event_id,
-        COALESCE(SUM(adjustment_amount),0) AS adjustment_amount,
-        MAX(id) AS latest_id
-      FROM {$wpdb->prefix}eggplant_event_settlements
-      GROUP BY event_id",
+      "SELECT totals.event_id, totals.adjustment_amount, latest.organizer_split_override AS organizer_override
+        FROM (
+          SELECT event_id, COALESCE(SUM(adjustment_amount),0) AS adjustment_amount
+          FROM {$wpdb->prefix}eggplant_event_settlements
+          GROUP BY event_id
+        ) totals
+        LEFT JOIN (
+          SELECT s1.event_id, s1.organizer_split_override
+          FROM {$wpdb->prefix}eggplant_event_settlements s1
+          INNER JOIN (
+            SELECT event_id, MAX(id) AS max_id
+            FROM {$wpdb->prefix}eggplant_event_settlements
+            GROUP BY event_id
+          ) latest_ids ON latest_ids.max_id = s1.id
+        ) latest ON latest.event_id = totals.event_id",
       ARRAY_A
     );
 
     $result = array();
     foreach ( $rows ?: array() as $row ) {
       $event_id = intval( $row['event_id'] );
-      $latest_override = $wpdb->get_var(
-        $wpdb->prepare(
-          "SELECT organizer_split_override FROM {$wpdb->prefix}eggplant_event_settlements WHERE id = %d LIMIT 1",
-          intval( $row['latest_id'] )
-        )
-      );
       $result[ $event_id ] = array(
         'adjustment_amount' => floatval( $row['adjustment_amount'] ),
-        'organizer_override'=> ( null === $latest_override || '' === $latest_override ) ? null : floatval( $latest_override ),
+        'organizer_override'=> ( null === $row['organizer_override'] || '' === $row['organizer_override'] ) ? null : floatval( $row['organizer_override'] ),
       );
     }
 
     return $result;
   }
+
 }

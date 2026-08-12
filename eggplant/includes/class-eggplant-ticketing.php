@@ -218,6 +218,7 @@ class Eggplant_Ticketing {
   public static function handle_ticket_purchase(): void {
     if ( ! isset( $_POST['eggplant_ticket_purchase_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['eggplant_ticket_purchase_nonce'] ) ), 'eggplant_ticket_purchase' ) ) {
       self::redirect_with_message( __( 'Invalid purchase request.', 'eggplant' ), 'error' );
+      return;
     }
 
     $event_id      = intval( $_POST['event_id'] ?? 0 );
@@ -229,6 +230,7 @@ class Eggplant_Ticketing {
 
     if ( empty( $event_id ) || empty( $ticket_type_id ) || empty( $buyer_name ) || ! is_email( $buyer_email ) ) {
       self::redirect_with_message( __( 'Please complete all required fields.', 'eggplant' ), 'error' );
+      return;
     }
 
     $result = Eggplant_DB::create_ticket_order(
@@ -242,6 +244,7 @@ class Eggplant_Ticketing {
 
     if ( empty( $result['success'] ) ) {
       self::redirect_with_message( (string) ( $result['message'] ?? __( 'Ticket purchase failed.', 'eggplant' ) ), 'error' );
+      return;
     }
 
     $url = add_query_arg(
@@ -261,15 +264,18 @@ class Eggplant_Ticketing {
   public static function handle_ticket_scan(): void {
     if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
       self::redirect_with_message( __( 'Unauthorized scanner access.', 'eggplant' ), 'error' );
+      return;
     }
 
     if ( ! isset( $_POST['eggplant_ticket_scan_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['eggplant_ticket_scan_nonce'] ) ), 'eggplant_ticket_scan' ) ) {
       self::redirect_with_message( __( 'Invalid scan request.', 'eggplant' ), 'error' );
+      return;
     }
 
     $barcode_value = sanitize_text_field( wp_unslash( $_POST['barcode_value'] ?? '' ) );
     if ( '' === $barcode_value ) {
       self::redirect_with_message( __( 'Please enter a barcode/ticket code.', 'eggplant' ), 'error' );
+      return;
     }
 
     $result = Eggplant_DB::scan_ticket_barcode( $barcode_value, get_current_user_id() );
@@ -291,6 +297,7 @@ class Eggplant_Ticketing {
 
     if ( empty( $data['event_id'] ) || empty( $data['ticket_name'] ) || $data['ticket_price'] < 0 ) {
       self::redirect_with_message( __( 'Please provide valid ticket type data.', 'eggplant' ), 'error' );
+      return;
     }
 
     $id = Eggplant_DB::insert_ticket_type( $data );
@@ -313,6 +320,12 @@ class Eggplant_Ticketing {
 
     if ( '' === $data['code'] || $data['discount_value'] <= 0 || ! in_array( $data['discount_type'], array( 'percent', 'fixed' ), true ) ) {
       self::redirect_with_message( __( 'Please provide valid discount code data.', 'eggplant' ), 'error' );
+      return;
+    }
+
+    if ( Eggplant_DB::discount_code_exists( $data['code'] ) ) {
+      self::redirect_with_message( __( 'This discount code already exists. Please choose a unique code.', 'eggplant' ), 'error' );
+      return;
     }
 
     $id = Eggplant_DB::insert_discount_code( $data );
@@ -332,6 +345,7 @@ class Eggplant_Ticketing {
 
     if ( empty( $data['event_id'] ) ) {
       self::redirect_with_message( __( 'Please select an event for settlement.', 'eggplant' ), 'error' );
+      return;
     }
 
     $id = Eggplant_DB::insert_event_settlement( $data );
@@ -350,6 +364,7 @@ class Eggplant_Ticketing {
 
     if ( ! $event_id ) {
       self::redirect_with_message( __( 'Invalid event.', 'eggplant' ), 'error' );
+      return;
     }
 
     $ok = Eggplant_DB::update_event_ticketing_settings( $event_id, $data );
@@ -441,19 +456,20 @@ class Eggplant_Ticketing {
             </thead>
             <tbody>
               <?php foreach ( $events as $event ) : ?>
+                <?php $form_id = 'eg-ticket-event-' . intval( $event['id'] ); ?>
                 <tr>
-                  <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-                    <td>
-                      <?php echo esc_html( $event['title'] ); ?>
+                  <td>
+                    <?php echo esc_html( $event['title'] ); ?>
+                    <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" id="<?php echo esc_attr( $form_id ); ?>">
                       <input type="hidden" name="action" value="eggplant_ticket_save_event_settings">
                       <input type="hidden" name="event_id" value="<?php echo esc_attr( $event['id'] ); ?>">
                       <?php wp_nonce_field( 'eggplant_ticket_save_event_settings', 'eggplant_ticket_save_event_settings_nonce' ); ?>
-                    </td>
-                    <td><input type="number" name="organizer_split_percent" step="0.01" min="0" max="100" value="<?php echo esc_attr( $event['organizer_split_percent'] ?? 0 ); ?>"></td>
-                    <td><input type="text" name="box_office_slug" value="<?php echo esc_attr( $event['box_office_slug'] ?? '' ); ?>"></td>
-                    <td><input type="text" name="scanner_slug" value="<?php echo esc_attr( $event['scanner_slug'] ?? '' ); ?>"></td>
-                    <td><button type="submit" class="button button-primary"><?php esc_html_e( 'Save', 'eggplant' ); ?></button></td>
-                  </form>
+                    </form>
+                  </td>
+                  <td><input type="number" name="organizer_split_percent" step="0.01" min="0" max="100" value="<?php echo esc_attr( $event['organizer_split_percent'] ?? 0 ); ?>" form="<?php echo esc_attr( $form_id ); ?>"></td>
+                  <td><input type="text" name="box_office_slug" value="<?php echo esc_attr( $event['box_office_slug'] ?? '' ); ?>" form="<?php echo esc_attr( $form_id ); ?>"></td>
+                  <td><input type="text" name="scanner_slug" value="<?php echo esc_attr( $event['scanner_slug'] ?? '' ); ?>" form="<?php echo esc_attr( $form_id ); ?>"></td>
+                  <td><button type="submit" class="button button-primary" form="<?php echo esc_attr( $form_id ); ?>"><?php esc_html_e( 'Save', 'eggplant' ); ?></button></td>
                 </tr>
               <?php endforeach; ?>
             </tbody>
@@ -715,10 +731,12 @@ class Eggplant_Ticketing {
   private static function assert_admin_post( string $nonce_field, string $nonce_action ): void {
     if ( ! current_user_can( 'manage_options' ) ) {
       self::redirect_with_message( __( 'Unauthorized action.', 'eggplant' ), 'error' );
+      return;
     }
 
     if ( ! isset( $_POST[ $nonce_field ] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST[ $nonce_field ] ) ), $nonce_action ) ) {
       self::redirect_with_message( __( 'Invalid request.', 'eggplant' ), 'error' );
+      return;
     }
   }
 

@@ -11,6 +11,14 @@ A WordPress plugin that transforms your site into a full-screen event-center por
 - The payroll screen calculates regular hours, weekly Ontario overtime, gross pay, deductions, net pay, and yearly T4-style totals from processed pay periods.
 - Ontario deduction defaults are editable in the payroll settings screen and should be reviewed each tax year before use.
 
+
+## Ticketing System
+
+- Use the `[eggplant_box_office]` shortcode on a public page to sell tickets with optional promo codes.
+- Use the `[eggplant_ticket_scanner]` shortcode on a staff-only page to validate ticket barcodes at entry.
+- Configure the Box Office and Ticket Scanner page URLs in `/wp-admin/admin.php?page=eggplant-settings`.
+- Manage pricing, discounts, scans, orders, and settlements from the new Ticketing admin pages under Event Portal.
+
 ## Automatic Database Upgrades
 
 Eggplant manages its own database schema versioning via the `EGGPLANT_DB_VERSION` constant defined in `eggplant.php`.
