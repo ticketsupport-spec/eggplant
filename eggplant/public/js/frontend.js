@@ -284,4 +284,30 @@
     syncStaffIdentifier();
   }
 
+  /* ── Tasks auto-refresh every 15 minutes ── */
+  const tasksList = document.getElementById('eg-ops-tasks-list');
+  if (tasksList) {
+    var tasksRefreshNonce = tasksList.dataset.nonce || '';
+
+    function refreshTasks() {
+      $.post(ajaxUrl, {
+        action:   'eggplant_refresh_tasks',
+        nonce:    tasksRefreshNonce,
+        page_url: window.location.href
+      }).done(function (res) {
+        if (res.success && res.data) {
+          tasksList.innerHTML = res.data;
+          // Re-sync staff identifier into any newly rendered hidden fields.
+          if (staffField) {
+            document.querySelectorAll('.eg-ops-staff-mirror').forEach(function (input) {
+              input.value = staffField.value;
+            });
+          }
+        }
+      });
+    }
+
+    setInterval(refreshTasks, 15 * 60 * 1000);
+  }
+
 }(jQuery));

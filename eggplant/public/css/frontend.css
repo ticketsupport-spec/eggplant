@@ -259,6 +259,44 @@ a:hover { text-decoration: underline; }
 
 .eg-calendar__day.eg-day--selected { outline: 3px solid #fff; }
 
+/* ── ADMIN QUICK LINKS ── */
+.eg-admin-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem 1rem;
+  padding: .5rem 1.5rem;
+  background: rgba(230, 57, 70, .12);
+  border-bottom: 2px solid var(--eg-primary, #e63946);
+  font-size: .85rem;
+}
+
+.eg-admin-links__label {
+  font-weight: 700;
+  color: var(--eg-primary, #e63946);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  font-size: .75rem;
+}
+
+.eg-admin-links__link {
+  display: inline-flex;
+  align-items: center;
+  padding: .3rem .75rem;
+  border-radius: 4px;
+  border: 1px solid var(--eg-primary, #e63946);
+  color: var(--eg-primary, #e63946);
+  font-weight: 600;
+  text-decoration: none;
+  transition: background .2s, color .2s;
+}
+
+.eg-admin-links__link:hover {
+  background: var(--eg-primary, #e63946);
+  color: #fff;
+  text-decoration: none;
+}
+
 /* ── OPERATIONAL SHORTCODES ── */
 .eg-ops {
   max-width: 900px;
@@ -266,52 +304,56 @@ a:hover { text-decoration: underline; }
   background: #1a1a1a;
   border: 1px solid var(--eg-secondary, #457b9d);
   border-radius: 8px;
-  padding: 1.5rem;
+  padding: 1rem;
 }
 
 .eg-ops h2 {
   color: var(--eg-primary, #e63946);
-  margin-bottom: 1rem;
+  margin-bottom: .75rem;
+  font-size: 1.2rem;
 }
 
 .eg-ops-message {
-  margin-bottom: 1rem;
-  padding: .75rem 1rem;
+  margin-bottom: .75rem;
+  padding: .5rem .75rem;
   border-left: 4px solid var(--eg-primary, #e63946);
   background: rgba(255,255,255,.08);
+  font-size: .9rem;
 }
 
 .eg-ops-staff {
   display: flex;
   flex-wrap: wrap;
-  gap: .75rem;
+  gap: .5rem;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: .75rem;
 }
 
 .eg-ops-staff input,
 .eg-ops-clock-form input {
   flex: 1;
-  min-width: 200px;
-  padding: .65rem .8rem;
+  min-width: 160px;
+  padding: .45rem .65rem;
   border-radius: 6px;
   border: 1px solid #555;
   background: #111;
   color: var(--eg-text, #f1faee);
+  font-size: .9rem;
 }
 
 .eg-ops-list {
   display: grid;
-  gap: 1rem;
+  gap: .5rem;
 }
 
 .eg-ops-task {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem;
-  border-radius: 8px;
+  align-items: center;
+  gap: .5rem;
+  padding: .6rem .75rem;
+  border-radius: 6px;
   border-left: 4px solid var(--eg-available, #2a9d8f);
   background: rgba(255,255,255,.05);
 }
@@ -324,20 +366,27 @@ a:hover { text-decoration: underline; }
 .eg-ops-task__meta {
   display: flex;
   flex-direction: column;
-  gap: .25rem;
+  gap: .15rem;
   opacity: .9;
+  font-size: .8rem;
+}
+
+.eg-ops-task__content h3 {
   font-size: .95rem;
+  margin-bottom: .15rem;
 }
 
 .eg-ops-task__actions {
   display: flex;
-  flex-direction: column;
-  gap: .75rem;
-  align-items: flex-start;
+  flex-direction: row;
+  gap: .5rem;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .eg-ops-status {
   font-weight: 700;
+  font-size: .8rem;
 }
 
 .eg-ops-task--overdue .eg-ops-status {
@@ -348,19 +397,25 @@ a:hover { text-decoration: underline; }
 .eg-ops-clock-form {
   display: flex;
   flex-wrap: wrap;
-  gap: .75rem;
+  gap: .5rem;
   align-items: center;
 }
 
 .eg-ops-clock-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: .75rem;
+  gap: .5rem;
 }
 
 @media (max-width: 700px) {
   .eg-ops-task {
     flex-direction: column;
+    align-items: flex-start;
+  }
+  .eg-ops-task__actions {
+    flex-direction: row;
+    width: 100%;
+    justify-content: space-between;
   }
 }
 

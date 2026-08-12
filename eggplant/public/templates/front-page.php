@@ -82,6 +82,25 @@ $title    = $settings['portal_title'] ?? 'Event Center';
 <?php endif; ?>
 
 <!-- ======================================================
+     ADMIN QUICK LINKS (visible to admins only)
+====================================================== -->
+<?php
+$staff_tasks_url = $settings['staff_tasks_url'] ?? '';
+$staff_clock_url = $settings['staff_clock_url'] ?? '';
+if ( current_user_can( 'manage_options' ) && ( $staff_tasks_url || $staff_clock_url ) ) :
+?>
+<div class="eg-admin-links" role="navigation" aria-label="<?php esc_attr_e( 'Staff quick links', 'eggplant' ); ?>">
+  <span class="eg-admin-links__label"><?php esc_html_e( 'Staff:', 'eggplant' ); ?></span>
+  <?php if ( $staff_tasks_url ) : ?>
+    <a href="<?php echo esc_url( $staff_tasks_url ); ?>" class="eg-admin-links__link"><?php esc_html_e( 'Operational Tasks', 'eggplant' ); ?></a>
+  <?php endif; ?>
+  <?php if ( $staff_clock_url ) : ?>
+    <a href="<?php echo esc_url( $staff_clock_url ); ?>" class="eg-admin-links__link"><?php esc_html_e( 'Staff Clock-In', 'eggplant' ); ?></a>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<!-- ======================================================
      MAIN CONTENT: CALENDAR + BOOKING FORM
 ====================================================== -->
 <main class="eg-main">

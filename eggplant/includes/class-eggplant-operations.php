@@ -21,6 +21,9 @@ class Eggplant_Operations {
     add_action( 'admin_post_eggplant_staff_clock', array( __CLASS__, 'handle_staff_clock' ) );
     add_action( 'admin_post_nopriv_eggplant_complete_task', array( __CLASS__, 'handle_complete_task' ) );
     add_action( 'admin_post_nopriv_eggplant_staff_clock', array( __CLASS__, 'handle_staff_clock' ) );
+
+    add_action( 'wp_ajax_eggplant_refresh_tasks', array( __CLASS__, 'ajax_refresh_tasks' ) );
+    add_action( 'wp_ajax_nopriv_eggplant_refresh_tasks', array( __CLASS__, 'ajax_refresh_tasks' ) );
   }
 
   /**
@@ -169,7 +172,6 @@ class Eggplant_Operations {
   public static function render_tasks_shortcode(): string {
     $tasks   = Eggplant_DB::get_active_tasks();
     $message = self::get_request_message();
-    $button_class = is_admin() ? 'button button-primary' : 'eg-btn eg-btn--primary';
 
     ob_start();
     ?>
@@ -189,37 +191,83 @@ class Eggplant_Operations {
           <label for="eg-ops-staff-identifier"><?php esc_html_e( 'Staff member', 'eggplant' ); ?></label>
           <input type="text" id="eg-ops-staff-identifier" class="eg-ops-staff-identifier" placeholder="<?php esc_attr_e( 'Enter your name or staff ID', 'eggplant' ); ?>">
         </div>
-        <div class="eg-ops-list">
-          <?php foreach ( $tasks as $task ) : ?>
-            <?php $status = self::get_task_status( $task ); ?>
-            <article class="eg-ops-task <?php echo $status['is_overdue'] ? 'eg-ops-task--overdue' : ''; ?>">
-              <div class="eg-ops-task__content">
-                <h3><?php echo esc_html( $task['task_name'] ); ?></h3>
-                <p class="eg-ops-task__meta">
-                  <span><?php echo esc_html( self::get_interval_label( $task ) ); ?></span>
-                  <span><?php echo esc_html( sprintf( __( 'Last completed: %s', 'eggplant' ), self::format_datetime( $status['last_completed_at'] ) ) ); ?></span>
-                  <span><?php echo esc_html( sprintf( __( 'Due: %s', 'eggplant' ), self::format_datetime( $status['next_due_at'] ) ) ); ?></span>
-                </p>
-              </div>
-              <div class="eg-ops-task__actions">
-                <span class="eg-ops-status"><?php echo esc_html( $status['status_label'] ); ?></span>
-                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="eg-ops-complete-form">
-                  <input type="hidden" name="action" value="eggplant_complete_task">
-                  <input type="hidden" name="task_id" value="<?php echo esc_attr( $task['id'] ); ?>">
-                  <input type="hidden" name="redirect_to" value="<?php echo esc_url( self::get_current_url() ); ?>">
-                  <?php wp_nonce_field( 'eggplant_complete_task_' . $task['id'], 'eggplant_complete_task_nonce' ); ?>
-                  <input type="hidden" name="staff_identifier" class="eg-ops-staff-mirror" value="">
-                  <button type="submit" class="<?php echo esc_attr( $button_class ); ?>"><?php esc_html_e( 'Mark Complete', 'eggplant' ); ?></button>
-                </form>
-              </div>
-            </article>
-          <?php endforeach; ?>
+        <div id="eg-ops-tasks-list" class="eg-ops-list" data-nonce="<?php echo esc_attr( wp_create_nonce( 'eggplant_refresh_tasks' ) ); ?>">
+          <?php echo self::render_task_items( $tasks, 'eg-btn eg-btn--primary' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped inside ?>
         </div>
       <?php endif; ?>
     </div>
     <?php
 
     return (string) ob_get_clean();
+  }
+
+  /**
+   * Render task item HTML sorted with overdue tasks first.
+   *
+   * @param array<int,array<string,mixed>> $tasks
+   * @param string                         $button_class CSS class(es) for the submit button.
+   * @param string                         $redirect_url URL to redirect to after completing a task.
+   */
+  private static function render_task_items( array $tasks, string $button_class = 'eg-btn eg-btn--primary', string $redirect_url = '' ): string {
+    if ( '' === $redirect_url ) {
+      $redirect_url = self::get_current_url();
+    }
+
+    // Attach status and sort: overdue first, then by next_due_at ascending.
+    $decorated = array();
+    foreach ( $tasks as $task ) {
+      $status        = self::get_task_status( $task );
+      $decorated[]   = array( 'task' => $task, 'status' => $status );
+    }
+
+    usort( $decorated, function ( $a, $b ) {
+      if ( $a['status']['is_overdue'] !== $b['status']['is_overdue'] ) {
+        return $a['status']['is_overdue'] ? -1 : 1;
+      }
+      $at = $a['status']['next_due_at'] ? strtotime( (string) $a['status']['next_due_at'] ) : PHP_INT_MAX;
+      $bt = $b['status']['next_due_at'] ? strtotime( (string) $b['status']['next_due_at'] ) : PHP_INT_MAX;
+      return $at <=> $bt;
+    } );
+
+    ob_start();
+    foreach ( $decorated as $item ) :
+      $task   = $item['task'];
+      $status = $item['status'];
+      ?>
+      <article class="eg-ops-task <?php echo $status['is_overdue'] ? 'eg-ops-task--overdue' : ''; ?>">
+        <div class="eg-ops-task__content">
+          <h3><?php echo esc_html( $task['task_name'] ); ?></h3>
+          <p class="eg-ops-task__meta">
+            <span><?php echo esc_html( self::get_interval_label( $task ) ); ?></span>
+            <span><?php echo esc_html( sprintf( __( 'Last completed: %s', 'eggplant' ), self::format_datetime( $status['last_completed_at'] ) ) ); ?></span>
+            <span><?php echo esc_html( sprintf( __( 'Due: %s', 'eggplant' ), self::format_datetime( $status['next_due_at'] ) ) ); ?></span>
+          </p>
+        </div>
+        <div class="eg-ops-task__actions">
+          <span class="eg-ops-status"><?php echo esc_html( $status['status_label'] ); ?></span>
+          <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="eg-ops-complete-form">
+            <input type="hidden" name="action" value="eggplant_complete_task">
+            <input type="hidden" name="task_id" value="<?php echo esc_attr( $task['id'] ); ?>">
+            <input type="hidden" name="redirect_to" value="<?php echo esc_url( $redirect_url ); ?>">
+            <?php wp_nonce_field( 'eggplant_complete_task_' . $task['id'], 'eggplant_complete_task_nonce' ); ?>
+            <input type="hidden" name="staff_identifier" class="eg-ops-staff-mirror" value="">
+            <button type="submit" class="<?php echo esc_attr( $button_class ); ?>"><?php esc_html_e( 'Mark Complete', 'eggplant' ); ?></button>
+          </form>
+        </div>
+      </article>
+      <?php
+    endforeach;
+    return (string) ob_get_clean();
+  }
+
+  /**
+   * AJAX handler: return refreshed task list HTML.
+   */
+  public static function ajax_refresh_tasks(): void {
+    check_ajax_referer( 'eggplant_refresh_tasks', 'nonce' );
+    $tasks        = Eggplant_DB::get_active_tasks();
+    $redirect_url = esc_url_raw( wp_unslash( $_POST['page_url'] ?? '' ) );
+    wp_send_json_success( self::render_task_items( $tasks, 'eg-btn eg-btn--primary', $redirect_url ) );
   }
 
   /**

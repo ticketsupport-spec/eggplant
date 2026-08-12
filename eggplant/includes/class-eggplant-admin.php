@@ -720,6 +720,27 @@ class Eggplant_Admin {
           <textarea name="custom_css" rows="10" class="large-text code"><?php echo esc_textarea( $settings['custom_css'] ); ?></textarea>
         </div>
 
+        <div class="eg-card">
+          <h2><?php esc_html_e( 'Staff Quick Links', 'eggplant' ); ?></h2>
+          <p class="description"><?php esc_html_e( 'Enter the URL of each staff page. When an admin is logged in, quick-access links to these pages will appear at the top of the public front page.', 'eggplant' ); ?></p>
+          <table class="form-table">
+            <tr>
+              <th><?php esc_html_e( 'Operational Tasks Page URL', 'eggplant' ); ?></th>
+              <td>
+                <input type="url" name="staff_tasks_url" value="<?php echo esc_attr( $settings['staff_tasks_url'] ); ?>" class="regular-text" placeholder="https://example.com/staff-tasks">
+                <p class="description"><?php esc_html_e( 'The page containing the [eggplant_tasks] shortcode.', 'eggplant' ); ?></p>
+              </td>
+            </tr>
+            <tr>
+              <th><?php esc_html_e( 'Staff Clock-In Page URL', 'eggplant' ); ?></th>
+              <td>
+                <input type="url" name="staff_clock_url" value="<?php echo esc_attr( $settings['staff_clock_url'] ); ?>" class="regular-text" placeholder="https://example.com/staff-clock">
+                <p class="description"><?php esc_html_e( 'The page containing the [eggplant_staff_clock] shortcode.', 'eggplant' ); ?></p>
+              </td>
+            </tr>
+          </table>
+        </div>
+
         <?php submit_button( __( 'Save Settings', 'eggplant' ) ); ?>
       </form>
     </div>
@@ -737,6 +758,8 @@ class Eggplant_Admin {
     $data['carousel_speed']    = max( 500, intval( $_POST['carousel_speed'] ?? 5000 ) );
     $data['custom_css']        = wp_strip_all_tags( wp_unslash( $_POST['custom_css'] ?? '' ) ); // Admin-only; HTML tags removed; CSS is trusted.
     $data['front_page_info']   = wp_kses_post( wp_unslash( $_POST['front_page_info'] ?? '' ) );
+    $data['staff_tasks_url']   = esc_url_raw( wp_unslash( $_POST['staff_tasks_url']  ?? '' ) );
+    $data['staff_clock_url']   = esc_url_raw( wp_unslash( $_POST['staff_clock_url']  ?? '' ) );
 
     foreach ( $color_keys as $key ) {
       // Color picker sends hex value; text field is the editable version.
