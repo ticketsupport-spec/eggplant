@@ -190,3 +190,12 @@
 .eg-admin .eg-card .button + .button {
   margin-left: .5rem;
 }
+
+/* POS admin */
+.eg-low-stock {
+  color: #b45309;
+  font-weight: bold;
+}
+.eg-row-low-stock td {
+  background-color: #fef9c3 !important;
+}

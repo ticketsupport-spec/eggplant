@@ -110,6 +110,9 @@ class Eggplant_Admin {
       'eggplant-settings',
       array( $this, 'page_settings' )
     );
+
+    // POS admin pages are registered by Eggplant_POS_Admin.
+    add_action( 'admin_menu', array( 'Eggplant_POS_Admin', 'add_menus' ), 12 );
   }
 
   // ------------------------------------------------------------------ assets
@@ -131,6 +134,10 @@ class Eggplant_Admin {
       'event-portal_page_eggplant-ticketing-orders',
       'event-portal_page_eggplant-ticketing-scans',
       'event-portal_page_eggplant-ticketing-settlements',
+      'event-portal_page_eggplant-pos-items',
+      'event-portal_page_eggplant-pos-sales',
+      'event-portal_page_eggplant-pos-inventory',
+      'event-portal_page_eggplant-pos-profit',
     );
     if ( ! in_array( $hook, $pages, true ) ) {
       return;
@@ -186,6 +193,7 @@ class Eggplant_Admin {
         }
       )
     );
+    $low_stock_count = count( Eggplant_POS::get_low_stock_items() );
     ?>
     <div class="wrap eg-admin">
       <h1><?php esc_html_e( 'Event Portal – Dashboard', 'eggplant' ); ?></h1>
@@ -215,6 +223,11 @@ class Eggplant_Admin {
           <span class="eg-dash-label"><?php esc_html_e( 'Staff Checked In', 'eggplant' ); ?></span>
           <a href="<?php echo esc_url( admin_url( 'admin.php?page=eggplant-staff-clock' ) ); ?>"><?php esc_html_e( 'View Clock', 'eggplant' ); ?></a>
         </div>
+        <div class="eg-dash-card <?php echo $low_stock_count ? 'eg-dash-card--alert' : ''; ?>">
+          <span class="eg-dash-number"><?php echo esc_html( $low_stock_count ); ?></span>
+          <span class="eg-dash-label"><?php esc_html_e( 'POS Low-Stock Items', 'eggplant' ); ?></span>
+          <a href="<?php echo esc_url( admin_url( 'admin.php?page=eggplant-pos-inventory' ) ); ?>"><?php esc_html_e( 'View Inventory', 'eggplant' ); ?></a>
+        </div>
       </div>
 
       <?php if ( $box_office_url || $ticket_scanner_url ) : ?>
@@ -227,6 +240,19 @@ class Eggplant_Admin {
           <?php if ( $ticket_scanner_url ) : ?>
             <a class="button" href="<?php echo esc_url( $ticket_scanner_url ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Open Ticket Scanner Page', 'eggplant' ); ?></a>
           <?php endif; ?>
+        </p>
+      </div>
+      <?php endif; ?>
+      <?php
+      $pos_url = $settings['pos_url'] ?? '';
+      if ( $pos_url ) : ?>
+      <div class="eg-card">
+        <h2><?php esc_html_e( 'Point of Sale', 'eggplant' ); ?></h2>
+        <p>
+          <a class="button button-primary" href="<?php echo esc_url( $pos_url ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Open POS Terminal', 'eggplant' ); ?></a>
+          <a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=eggplant-pos-items' ) ); ?>"><?php esc_html_e( 'Manage Items', 'eggplant' ); ?></a>
+          <a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=eggplant-pos-sales' ) ); ?>"><?php esc_html_e( 'Sales Report', 'eggplant' ); ?></a>
+          <a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=eggplant-pos-inventory' ) ); ?>"><?php esc_html_e( 'Inventory', 'eggplant' ); ?></a>
         </p>
       </div>
       <?php endif; ?>
@@ -776,6 +802,13 @@ class Eggplant_Admin {
                 <p class="description"><?php esc_html_e( 'Staff entry page containing the [eggplant_ticket_scanner] shortcode.', 'eggplant' ); ?></p>
               </td>
             </tr>
+            <tr>
+              <th><?php esc_html_e( 'Point of Sale Page URL', 'eggplant' ); ?></th>
+              <td>
+                <input type="url" name="pos_url" value="<?php echo esc_attr( $settings['pos_url'] ?? '' ); ?>" class="regular-text" placeholder="https://example.com/pos">
+                <p class="description"><?php esc_html_e( 'Page containing the [eggplant_pos] shortcode. Shown as a quick link on the front page for admins.', 'eggplant' ); ?></p>
+              </td>
+            </tr>
           </table>
         </div>
 
@@ -800,6 +833,7 @@ class Eggplant_Admin {
     $data['staff_clock_url']   = esc_url_raw( wp_unslash( $_POST['staff_clock_url']  ?? '' ) );
     $data['box_office_url']   = esc_url_raw( wp_unslash( $_POST['box_office_url']  ?? '' ) );
     $data['ticket_scanner_url']= esc_url_raw( wp_unslash( $_POST['ticket_scanner_url']  ?? '' ) );
+    $data['pos_url']           = esc_url_raw( wp_unslash( $_POST['pos_url']             ?? '' ) );
 
     foreach ( $color_keys as $key ) {
       // Color picker sends hex value; text field is the editable version.

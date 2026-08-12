@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Eggplant Event Portal
  * Description:       Transforms WordPress into a full-screen event-center portal with a carousel, availability calendar, booking-request form, and a complete admin panel for managing time slots, events, and settings.
- * Version:           1.3.0
+ * Version:           1.4.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            ticketsupport-spec
@@ -15,8 +15,8 @@ if (!defined('WPINC')) {
   die;
 }
 
-define('EGGPLANT_VERSION', '1.3.0');
-define('EGGPLANT_DB_VERSION', '1.3.0');
+define('EGGPLANT_VERSION', '1.4.0');
+define('EGGPLANT_DB_VERSION', '1.4.0');
 define('EGGPLANT_PLUGIN_FILE', __FILE__);
 define('EGGPLANT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('EGGPLANT_PLUGIN_URL', plugin_dir_url(__FILE__));
