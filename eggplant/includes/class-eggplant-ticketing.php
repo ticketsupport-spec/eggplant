@@ -12,7 +12,7 @@ class Eggplant_Ticketing {
     add_shortcode( 'eggplant_box_office', array( __CLASS__, 'render_box_office_shortcode' ) );
     add_shortcode( 'eggplant_ticket_scanner', array( __CLASS__, 'render_ticket_scanner_shortcode' ) );
 
-    add_action( 'admin_menu', array( __CLASS__, 'add_admin_menus' ) );
+    add_action( 'admin_menu', array( __CLASS__, 'add_admin_menus' ), 11 );
 
     add_action( 'template_redirect', array( __CLASS__, 'redirect_pretty_admin_urls' ) );
 
