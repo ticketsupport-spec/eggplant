@@ -308,7 +308,73 @@ class Eggplant_Activator {
       KEY created_at (created_at)
     ) $charset_collate;";
 
+    // POS items.
+    $sql_pos_items = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}eggplant_pos_items (
+      id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      name           VARCHAR(255) NOT NULL DEFAULT '',
+      sku            VARCHAR(100) DEFAULT '',
+      category       VARCHAR(100) DEFAULT '',
+      price          DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      cost_price     DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      tax_rate       DECIMAL(6,4) NOT NULL DEFAULT 13.0000,
+      stock_quantity INT UNSIGNED NOT NULL DEFAULT 0,
+      reorder_level  INT UNSIGNED NOT NULL DEFAULT 5,
+      active         TINYINT(1) NOT NULL DEFAULT 1,
+      created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY active (active),
+      KEY category (category)
+    ) $charset_collate;";
+
+    // POS sales header.
+    $sql_pos_sales = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}eggplant_pos_sales (
+      id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      subtotal       DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      tax_total      DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      total          DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      tender_amount  DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      change_amount  DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      payment_method VARCHAR(30) NOT NULL DEFAULT 'cash',
+      cashier        VARCHAR(200) DEFAULT '',
+      sold_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY sold_at (sold_at),
+      KEY payment_method (payment_method)
+    ) $charset_collate;";
+
+    // POS sale line items.
+    $sql_pos_sale_items = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}eggplant_pos_sale_items (
+      id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      sale_id     BIGINT UNSIGNED NOT NULL,
+      item_id     BIGINT UNSIGNED NOT NULL,
+      item_name   VARCHAR(255) NOT NULL DEFAULT '',
+      qty         INT UNSIGNED NOT NULL DEFAULT 1,
+      unit_price  DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      cost_price  DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      tax_rate    DECIMAL(6,4) NOT NULL DEFAULT 0.0000,
+      line_tax    DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      line_total  DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY sale_id (sale_id),
+      KEY item_id (item_id)
+    ) $charset_collate;";
+
     require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+    dbDelta( $sql_pos_items );
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
+      error_log( 'Eggplant dbDelta error (eggplant_pos_items): ' . $wpdb->last_error );
+    }
+    dbDelta( $sql_pos_sales );
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
+      error_log( 'Eggplant dbDelta error (eggplant_pos_sales): ' . $wpdb->last_error );
+    }
+    dbDelta( $sql_pos_sale_items );
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
+      error_log( 'Eggplant dbDelta error (eggplant_pos_sale_items): ' . $wpdb->last_error );
+    }
     dbDelta( $sql_slots );
     if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
       error_log( 'Eggplant dbDelta error (eggplant_time_slots): ' . $wpdb->last_error );
@@ -396,6 +462,7 @@ class Eggplant_Activator {
       'staff_clock_url'      => '',
       'box_office_url'       => '',
       'ticket_scanner_url'   => '',
+      'pos_url'              => '',
     );
     if ( ! get_option( 'eggplant_settings' ) ) {
       add_option( 'eggplant_settings', $defaults );

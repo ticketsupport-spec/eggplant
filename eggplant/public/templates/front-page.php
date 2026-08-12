@@ -89,7 +89,8 @@ $staff_tasks_url    = $settings['staff_tasks_url'] ?? '';
 $staff_clock_url    = $settings['staff_clock_url'] ?? '';
 $box_office_url     = $settings['box_office_url'] ?? '';
 $ticket_scanner_url = $settings['ticket_scanner_url'] ?? '';
-if ( current_user_can( 'manage_options' ) && ( $staff_tasks_url || $staff_clock_url || $box_office_url || $ticket_scanner_url ) ) :
+$pos_url            = $settings['pos_url'] ?? '';
+if ( current_user_can( 'manage_options' ) && ( $staff_tasks_url || $staff_clock_url || $box_office_url || $ticket_scanner_url || $pos_url ) ) :
 ?>
 <div class="eg-admin-links" role="navigation" aria-label="<?php esc_attr_e( 'Staff quick links', 'eggplant' ); ?>">
   <span class="eg-admin-links__label"><?php esc_html_e( 'Staff:', 'eggplant' ); ?></span>
@@ -104,6 +105,9 @@ if ( current_user_can( 'manage_options' ) && ( $staff_tasks_url || $staff_clock_
   <?php endif; ?>
   <?php if ( $ticket_scanner_url ) : ?>
     <a href="<?php echo esc_url( $ticket_scanner_url ); ?>" class="eg-admin-links__link"><?php esc_html_e( 'Ticket Scanner', 'eggplant' ); ?></a>
+  <?php endif; ?>
+  <?php if ( $pos_url ) : ?>
+    <a href="<?php echo esc_url( $pos_url ); ?>" class="eg-admin-links__link"><?php esc_html_e( 'Point of Sale', 'eggplant' ); ?></a>
   <?php endif; ?>
 </div>
 <?php endif; ?>

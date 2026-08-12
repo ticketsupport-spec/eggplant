@@ -30,6 +30,8 @@ class Eggplant {
     require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-frontend.php';
     require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-admin.php';
     require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-ticketing.php';
+    require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-pos.php';
+    require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-pos-admin.php';
   }
 
   private function init_features(): void {
@@ -37,6 +39,7 @@ class Eggplant {
     Eggplant_Payroll::init();
     Eggplant_Operations::init();
     Eggplant_Ticketing::init();
+    Eggplant_POS::init();
 
     new Eggplant_Frontend();
 

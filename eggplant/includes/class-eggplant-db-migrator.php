@@ -35,6 +35,9 @@ class Eggplant_DB_Migrator {
     'eggplant_ticket_scans',
     'eggplant_discount_codes',
     'eggplant_event_settlements',
+    'eggplant_pos_items',
+    'eggplant_pos_sales',
+    'eggplant_pos_sale_items',
   );
 
   /**
