@@ -192,7 +192,7 @@ class Eggplant_Operations {
           <input type="text" id="eg-ops-staff-identifier" class="eg-ops-staff-identifier" placeholder="<?php esc_attr_e( 'Enter your name or staff ID', 'eggplant' ); ?>">
         </div>
         <div id="eg-ops-tasks-list" class="eg-ops-list" data-nonce="<?php echo esc_attr( wp_create_nonce( 'eggplant_refresh_tasks' ) ); ?>">
-          <?php echo self::render_task_items( $tasks ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped inside ?>
+          <?php echo self::render_task_items( $tasks, 'eg-btn eg-btn--primary' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already escaped inside ?>
         </div>
       <?php endif; ?>
     </div>
@@ -205,9 +205,9 @@ class Eggplant_Operations {
    * Render task item HTML sorted with overdue tasks first.
    *
    * @param array<int,array<string,mixed>> $tasks
+   * @param string                         $button_class CSS class(es) for the submit button.
    */
-  private static function render_task_items( array $tasks ): string {
-    $button_class = is_admin() ? 'button button-primary' : 'eg-btn eg-btn--primary';
+  private static function render_task_items( array $tasks, string $button_class = 'eg-btn eg-btn--primary' ): string {
 
     // Attach status and sort: overdue first, then by next_due_at ascending.
     $decorated = array();
@@ -262,7 +262,7 @@ class Eggplant_Operations {
   public static function ajax_refresh_tasks(): void {
     check_ajax_referer( 'eggplant_refresh_tasks', 'nonce' );
     $tasks = Eggplant_DB::get_active_tasks();
-    wp_send_json_success( self::render_task_items( $tasks ) );
+    wp_send_json_success( self::render_task_items( $tasks, 'eg-btn eg-btn--primary' ) );
   }
 
   /**
