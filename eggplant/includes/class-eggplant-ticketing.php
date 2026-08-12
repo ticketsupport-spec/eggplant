@@ -758,7 +758,7 @@ class Eggplant_Ticketing {
   private static function get_redirect_url(): string {
     $redirect_to = esc_url_raw( wp_unslash( $_POST['redirect_to'] ?? '' ) );
     if ( empty( $redirect_to ) ) {
-      $redirect_to = home_url( '/' );
+      $redirect_to = wp_get_referer() ?: home_url( '/' );
     }
     return $redirect_to;
   }
