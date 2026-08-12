@@ -30,6 +30,8 @@ class Eggplant_Settings {
       'front_page_info'   => '',
       'contact_email'     => get_option( 'admin_email' ),
       'show_booking_form' => 1,
+      'staff_tasks_url'   => '',
+      'staff_clock_url'   => '',
     );
     $saved = get_option( 'eggplant_settings', array() );
     return wp_parse_args( (array) $saved, $defaults );

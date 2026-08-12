@@ -259,6 +259,44 @@ a:hover { text-decoration: underline; }
 
 .eg-calendar__day.eg-day--selected { outline: 3px solid #fff; }
 
+/* ── ADMIN QUICK LINKS ── */
+.eg-admin-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem 1rem;
+  padding: .5rem 1.5rem;
+  background: rgba(230, 57, 70, .12);
+  border-bottom: 2px solid var(--eg-primary, #e63946);
+  font-size: .85rem;
+}
+
+.eg-admin-links__label {
+  font-weight: 700;
+  color: var(--eg-primary, #e63946);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  font-size: .75rem;
+}
+
+.eg-admin-links__link {
+  display: inline-flex;
+  align-items: center;
+  padding: .3rem .75rem;
+  border-radius: 4px;
+  border: 1px solid var(--eg-primary, #e63946);
+  color: var(--eg-primary, #e63946);
+  font-weight: 600;
+  text-decoration: none;
+  transition: background .2s, color .2s;
+}
+
+.eg-admin-links__link:hover {
+  background: var(--eg-primary, #e63946);
+  color: #fff;
+  text-decoration: none;
+}
+
 /* ── OPERATIONAL SHORTCODES ── */
 .eg-ops {
   max-width: 900px;
