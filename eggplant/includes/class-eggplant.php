@@ -29,12 +29,14 @@ class Eggplant {
     require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-operations.php';
     require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-frontend.php';
     require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-admin.php';
+    require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-ticketing.php';
   }
 
   private function init_features(): void {
     Eggplant_DB_Migrator::init();
     Eggplant_Payroll::init();
     Eggplant_Operations::init();
+    Eggplant_Ticketing::init();
 
     new Eggplant_Frontend();
 

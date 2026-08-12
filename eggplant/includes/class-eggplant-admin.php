@@ -125,6 +125,12 @@ class Eggplant_Admin {
       'event-portal_page_eggplant-payroll',
       'event-portal_page_eggplant-staff-clock',
       'event-portal_page_eggplant-settings',
+      'event-portal_page_eggplant-ticketing-dashboard',
+      'event-portal_page_eggplant-ticketing-events',
+      'event-portal_page_eggplant-ticketing-discounts',
+      'event-portal_page_eggplant-ticketing-orders',
+      'event-portal_page_eggplant-ticketing-scans',
+      'event-portal_page_eggplant-ticketing-settlements',
     );
     if ( ! in_array( $hook, $pages, true ) ) {
       return;
@@ -168,6 +174,9 @@ class Eggplant_Admin {
         }
       )
     );
+    $settings = Eggplant_Settings::get_all();
+    $box_office_url = $settings['box_office_url'] ?? '';
+    $ticket_scanner_url = $settings['ticket_scanner_url'] ?? '';
     $staff_entries = Eggplant_DB::get_recent_staff_checkins( 100 );
     $checked_in_count = count(
       array_filter(
@@ -207,6 +216,20 @@ class Eggplant_Admin {
           <a href="<?php echo esc_url( admin_url( 'admin.php?page=eggplant-staff-clock' ) ); ?>"><?php esc_html_e( 'View Clock', 'eggplant' ); ?></a>
         </div>
       </div>
+
+      <?php if ( $box_office_url || $ticket_scanner_url ) : ?>
+      <div class="eg-card">
+        <h2><?php esc_html_e( 'Ticketing Quick Links', 'eggplant' ); ?></h2>
+        <p>
+          <?php if ( $box_office_url ) : ?>
+            <a class="button button-primary" href="<?php echo esc_url( $box_office_url ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Open Box Office Page', 'eggplant' ); ?></a>
+          <?php endif; ?>
+          <?php if ( $ticket_scanner_url ) : ?>
+            <a class="button" href="<?php echo esc_url( $ticket_scanner_url ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Open Ticket Scanner Page', 'eggplant' ); ?></a>
+          <?php endif; ?>
+        </p>
+      </div>
+      <?php endif; ?>
     </div>
     <?php
   }
@@ -738,6 +761,21 @@ class Eggplant_Admin {
                 <p class="description"><?php esc_html_e( 'The page containing the [eggplant_staff_clock] shortcode.', 'eggplant' ); ?></p>
               </td>
             </tr>
+
+            <tr>
+              <th><?php esc_html_e( 'Box Office Page URL', 'eggplant' ); ?></th>
+              <td>
+                <input type="url" name="box_office_url" value="<?php echo esc_attr( $settings['box_office_url'] ); ?>" class="regular-text" placeholder="https://example.com/box-office">
+                <p class="description"><?php esc_html_e( 'Public page containing the [eggplant_box_office] shortcode.', 'eggplant' ); ?></p>
+              </td>
+            </tr>
+            <tr>
+              <th><?php esc_html_e( 'Ticket Scanner Page URL', 'eggplant' ); ?></th>
+              <td>
+                <input type="url" name="ticket_scanner_url" value="<?php echo esc_attr( $settings['ticket_scanner_url'] ); ?>" class="regular-text" placeholder="https://example.com/ticket-scanner">
+                <p class="description"><?php esc_html_e( 'Staff entry page containing the [eggplant_ticket_scanner] shortcode.', 'eggplant' ); ?></p>
+              </td>
+            </tr>
           </table>
         </div>
 
@@ -760,6 +798,8 @@ class Eggplant_Admin {
     $data['front_page_info']   = wp_kses_post( wp_unslash( $_POST['front_page_info'] ?? '' ) );
     $data['staff_tasks_url']   = esc_url_raw( wp_unslash( $_POST['staff_tasks_url']  ?? '' ) );
     $data['staff_clock_url']   = esc_url_raw( wp_unslash( $_POST['staff_clock_url']  ?? '' ) );
+    $data['box_office_url']   = esc_url_raw( wp_unslash( $_POST['box_office_url']  ?? '' ) );
+    $data['ticket_scanner_url']= esc_url_raw( wp_unslash( $_POST['ticket_scanner_url']  ?? '' ) );
 
     foreach ( $color_keys as $key ) {
       // Color picker sends hex value; text field is the editable version.

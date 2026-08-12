@@ -70,8 +70,11 @@ class Eggplant_Activator {
       link_url    TEXT,
       start_date  DATE,
       end_date    DATE,
-      sort_order  INT NOT NULL DEFAULT 0,
-      active      TINYINT(1) NOT NULL DEFAULT 1,
+      sort_order              INT NOT NULL DEFAULT 0,
+      active                  TINYINT(1) NOT NULL DEFAULT 1,
+      organizer_split_percent DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+      box_office_slug         VARCHAR(100) DEFAULT '',
+      scanner_slug            VARCHAR(100) DEFAULT '',
       created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (id),
       KEY active (active)
@@ -198,6 +201,112 @@ class Eggplant_Activator {
       KEY staff_id (staff_id)
     ) $charset_collate;";
 
+
+    // Ticket types by event.
+    $sql_ticket_types = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}eggplant_ticket_types (
+      id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      event_id        BIGINT UNSIGNED NOT NULL,
+      ticket_name     VARCHAR(200) NOT NULL DEFAULT '',
+      ticket_price    DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      quantity_total  INT UNSIGNED NOT NULL DEFAULT 0,
+      quantity_sold   INT UNSIGNED NOT NULL DEFAULT 0,
+      active          TINYINT(1) NOT NULL DEFAULT 1,
+      created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY event_id (event_id),
+      KEY active (active)
+    ) $charset_collate;";
+
+    // Ticket orders.
+    $sql_ticket_orders = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}eggplant_ticket_orders (
+      id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      event_id         BIGINT UNSIGNED NOT NULL,
+      order_number     VARCHAR(100) NOT NULL,
+      order_access_key VARCHAR(100) NOT NULL,
+      buyer_name       VARCHAR(200) NOT NULL DEFAULT '',
+      buyer_email      VARCHAR(200) NOT NULL DEFAULT '',
+      gross_amount     DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      discount_amount  DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      net_amount       DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      discount_code    VARCHAR(100) DEFAULT '',
+      payment_status   VARCHAR(30) NOT NULL DEFAULT 'paid',
+      created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY order_number (order_number),
+      KEY event_id (event_id),
+      KEY created_at (created_at)
+    ) $charset_collate;";
+
+    // Individual tickets.
+    $sql_tickets = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}eggplant_tickets (
+      id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      order_id       BIGINT UNSIGNED NOT NULL,
+      event_id       BIGINT UNSIGNED NOT NULL,
+      ticket_type_id BIGINT UNSIGNED NOT NULL,
+      ticket_code    VARCHAR(100) NOT NULL,
+      barcode_value  VARCHAR(255) NOT NULL,
+      ticket_status  VARCHAR(30) NOT NULL DEFAULT 'valid',
+      scanned_at     DATETIME NULL,
+      scanned_by     BIGINT UNSIGNED NULL,
+      created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY ticket_code (ticket_code),
+      UNIQUE KEY barcode_value (barcode_value),
+      KEY event_id (event_id),
+      KEY order_id (order_id),
+      KEY ticket_status (ticket_status)
+    ) $charset_collate;";
+
+    // Scan log / audit.
+    $sql_ticket_scans = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}eggplant_ticket_scans (
+      id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      ticket_id     BIGINT UNSIGNED NULL,
+      event_id      BIGINT UNSIGNED NULL,
+      barcode_value VARCHAR(255) NOT NULL,
+      scan_status   VARCHAR(30) NOT NULL DEFAULT 'invalid',
+      scan_message  VARCHAR(255) DEFAULT '',
+      scanned_by    BIGINT UNSIGNED NULL,
+      created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY ticket_id (ticket_id),
+      KEY event_id (event_id),
+      KEY scan_status (scan_status),
+      KEY created_at (created_at)
+    ) $charset_collate;";
+
+    // Discount codes.
+    $sql_discount_codes = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}eggplant_discount_codes (
+      id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      code           VARCHAR(100) NOT NULL,
+      event_id       BIGINT UNSIGNED NULL,
+      discount_type  VARCHAR(30) NOT NULL DEFAULT 'percent',
+      discount_value DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      max_uses       INT UNSIGNED NOT NULL DEFAULT 0,
+      used_count     INT UNSIGNED NOT NULL DEFAULT 0,
+      active         TINYINT(1) NOT NULL DEFAULT 1,
+      start_date     DATE NULL,
+      end_date       DATE NULL,
+      created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY code (code),
+      KEY event_id (event_id),
+      KEY active (active)
+    ) $charset_collate;";
+
+    // Settlement adjustments and overrides.
+    $sql_event_settlements = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}eggplant_event_settlements (
+      id                       BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      event_id                 BIGINT UNSIGNED NOT NULL,
+      adjustment_amount        DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      adjustment_note          VARCHAR(255) DEFAULT '',
+      organizer_split_override DECIMAL(5,2) NULL,
+      created_by               BIGINT UNSIGNED NULL,
+      created_at               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY event_id (event_id),
+      KEY created_at (created_at)
+    ) $charset_collate;";
+
     require_once ABSPATH . 'wp-admin/includes/upgrade.php';
     dbDelta( $sql_slots );
     if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
@@ -236,6 +345,31 @@ class Eggplant_Activator {
       error_log( 'Eggplant dbDelta error (eggplant_payroll_entries): ' . $wpdb->last_error );
     }
 
+    dbDelta( $sql_ticket_types );
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
+      error_log( 'Eggplant dbDelta error (eggplant_ticket_types): ' . $wpdb->last_error );
+    }
+    dbDelta( $sql_ticket_orders );
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
+      error_log( 'Eggplant dbDelta error (eggplant_ticket_orders): ' . $wpdb->last_error );
+    }
+    dbDelta( $sql_tickets );
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
+      error_log( 'Eggplant dbDelta error (eggplant_tickets): ' . $wpdb->last_error );
+    }
+    dbDelta( $sql_ticket_scans );
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
+      error_log( 'Eggplant dbDelta error (eggplant_ticket_scans): ' . $wpdb->last_error );
+    }
+    dbDelta( $sql_discount_codes );
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
+      error_log( 'Eggplant dbDelta error (eggplant_discount_codes): ' . $wpdb->last_error );
+    }
+    dbDelta( $sql_event_settlements );
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
+      error_log( 'Eggplant dbDelta error (eggplant_event_settlements): ' . $wpdb->last_error );
+    }
+
     update_option( 'eggplant_db_version', EGGPLANT_DB_VERSION );
   }
 
@@ -257,6 +391,10 @@ class Eggplant_Activator {
       'contact_email'        => get_option( 'admin_email' ),
       'front_page_info'      => '',
       'show_booking_form'    => 1,
+      'staff_tasks_url'      => '',
+      'staff_clock_url'      => '',
+      'box_office_url'       => '',
+      'ticket_scanner_url'   => '',
     );
     if ( ! get_option( 'eggplant_settings' ) ) {
       add_option( 'eggplant_settings', $defaults );

@@ -552,3 +552,53 @@ a:hover { text-decoration: underline; }
   .eg-calendar__day { font-size: .8rem; }
   .eg-booking-section { padding: 1.2rem; }
 }
+
+
+/* ── TICKETING ── */
+.eg-ticketing {
+  max-width: 860px;
+  margin: 2rem auto;
+  padding: 1.5rem;
+  border: 1px solid var(--eg-secondary, #457b9d);
+  border-radius: 8px;
+  background: #111;
+}
+
+.eg-ticket-form .eg-form-row {
+  margin-bottom: .9rem;
+}
+
+.eg-ticket-form input,
+.eg-ticket-form select {
+  width: 100%;
+  max-width: 500px;
+}
+
+.eg-ticket-receipt {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--eg-primary, #e63946);
+  border-radius: 8px;
+}
+
+.eg-ticket-print-wrap {
+  margin: 1rem 0;
+}
+
+.eg-print-ticket {
+  border: 1px dashed #999;
+  border-radius: 8px;
+  padding: .8rem;
+  margin-bottom: .8rem;
+  background: #1a1a1a;
+}
+
+@media print {
+  .eg-ticket-form,
+  .eg-admin-links,
+  .eg-carousel,
+  .eg-calendar-section,
+  .eg-booking-section { display: none !important; }
+
+  .eg-print-ticket { page-break-inside: avoid; }
+}

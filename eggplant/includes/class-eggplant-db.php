@@ -564,4 +564,666 @@ class Eggplant_DB {
     );
     return $row ?: null;
   }
+
+
+  // ------------------------------------------------------------------ ticketing
+
+  /**
+   * Return all events with ticketing-relevant fields.
+   *
+   * @return array<int,array<string,mixed>>
+   */
+  public static function get_ticketing_events(): array {
+    global $wpdb;
+    $results = $wpdb->get_results(
+      // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- table name uses internal prefix only.
+      "SELECT * FROM {$wpdb->prefix}eggplant_events WHERE active = 1 ORDER BY sort_order ASC, id ASC",
+      ARRAY_A
+    );
+
+    return $results ?: array();
+  }
+
+  /**
+   * Update per-event ticketing settings.
+   */
+  public static function update_event_ticketing_settings( int $event_id, array $data ): bool {
+    global $wpdb;
+    $result = $wpdb->update(
+      $wpdb->prefix . 'eggplant_events',
+      array(
+        'organizer_split_percent' => max( 0, min( 100, floatval( $data['organizer_split_percent'] ?? 0 ) ) ),
+        'box_office_slug'         => sanitize_title( $data['box_office_slug'] ?? '' ),
+        'scanner_slug'            => sanitize_title( $data['scanner_slug'] ?? '' ),
+      ),
+      array( 'id' => $event_id ),
+      array( '%f', '%s', '%s' ),
+      array( '%d' )
+    );
+
+    return false !== $result;
+  }
+
+  /**
+   * Insert a ticket type.
+   *
+   * @return int|false
+   */
+  public static function insert_ticket_type( array $data ) {
+    global $wpdb;
+    $result = $wpdb->insert(
+      $wpdb->prefix . 'eggplant_ticket_types',
+      array(
+        'event_id'       => intval( $data['event_id'] ?? 0 ),
+        'ticket_name'    => sanitize_text_field( $data['ticket_name'] ?? '' ),
+        'ticket_price'   => max( 0, floatval( $data['ticket_price'] ?? 0 ) ),
+        'quantity_total' => max( 1, intval( $data['quantity_total'] ?? 1 ) ),
+        'quantity_sold'  => 0,
+        'active'         => ! empty( $data['active'] ) ? 1 : 0,
+      ),
+      array( '%d', '%s', '%f', '%d', '%d', '%d' )
+    );
+
+    return $result ? $wpdb->insert_id : false;
+  }
+
+  /**
+   * @return array<int,array<string,mixed>>
+   */
+  public static function get_all_ticket_types(): array {
+    global $wpdb;
+    $results = $wpdb->get_results(
+      // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- table names use internal prefix only.
+      "SELECT t.*, e.title AS event_title
+        FROM {$wpdb->prefix}eggplant_ticket_types t
+        INNER JOIN {$wpdb->prefix}eggplant_events e ON e.id = t.event_id
+        ORDER BY e.sort_order ASC, e.id ASC, t.id ASC",
+      ARRAY_A
+    );
+
+    return $results ?: array();
+  }
+
+  /**
+   * Insert a discount code.
+   *
+   * @return int|false
+   */
+  public static function insert_discount_code( array $data ) {
+    global $wpdb;
+    $result = $wpdb->insert(
+      $wpdb->prefix . 'eggplant_discount_codes',
+      array(
+        'code'           => strtoupper( sanitize_text_field( $data['code'] ?? '' ) ),
+        'event_id'       => ! empty( $data['event_id'] ) ? intval( $data['event_id'] ) : null,
+        'discount_type'  => in_array( $data['discount_type'] ?? 'percent', array( 'percent', 'fixed' ), true ) ? $data['discount_type'] : 'percent',
+        'discount_value' => max( 0, floatval( $data['discount_value'] ?? 0 ) ),
+        'max_uses'       => max( 0, intval( $data['max_uses'] ?? 0 ) ),
+        'used_count'     => 0,
+        'active'         => ! empty( $data['active'] ) ? 1 : 0,
+        'start_date'     => sanitize_text_field( $data['start_date'] ?? '' ) ?: null,
+        'end_date'       => sanitize_text_field( $data['end_date'] ?? '' ) ?: null,
+      ),
+      array( '%s', '%d', '%s', '%f', '%d', '%d', '%d', '%s', '%s' )
+    );
+
+    return $result ? $wpdb->insert_id : false;
+  }
+
+  /**
+   * @return array<int,array<string,mixed>>
+   */
+  public static function get_discount_codes(): array {
+    global $wpdb;
+    $results = $wpdb->get_results(
+      // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- table names use internal prefix only.
+      "SELECT d.*, e.title AS event_title
+        FROM {$wpdb->prefix}eggplant_discount_codes d
+        LEFT JOIN {$wpdb->prefix}eggplant_events e ON e.id = d.event_id
+        ORDER BY d.created_at DESC, d.id DESC",
+      ARRAY_A
+    );
+
+    return $results ?: array();
+  }
+
+  /**
+   * Create an order and issue tickets in one transaction-safe operation.
+   *
+   * @return array<string,mixed>
+   */
+  public static function create_ticket_order( int $event_id, int $ticket_type_id, int $quantity, string $buyer_name, string $buyer_email, string $promo_code = '' ): array {
+    global $wpdb;
+
+    $event_id      = max( 1, $event_id );
+    $ticket_type_id= max( 1, $ticket_type_id );
+    $quantity      = max( 1, min( 20, $quantity ) );
+
+    $ticket_type = $wpdb->get_row(
+      $wpdb->prepare(
+        "SELECT * FROM {$wpdb->prefix}eggplant_ticket_types WHERE id = %d AND active = 1 LIMIT 1",
+        $ticket_type_id
+      ),
+      ARRAY_A
+    );
+
+    if ( ! $ticket_type || intval( $ticket_type['event_id'] ) !== $event_id ) {
+      return array( 'success' => false, 'message' => __( 'Invalid ticket type selection.', 'eggplant' ) );
+    }
+
+    $available = intval( $ticket_type['quantity_total'] ) - intval( $ticket_type['quantity_sold'] );
+    if ( $available < $quantity ) {
+      return array( 'success' => false, 'message' => __( 'Not enough tickets available for this ticket type.', 'eggplant' ) );
+    }
+
+    $gross = round( floatval( $ticket_type['ticket_price'] ) * $quantity, 2 );
+    $discount_amount = 0.00;
+    $discount_row = null;
+
+    if ( '' !== $promo_code ) {
+      $discount_row = self::validate_discount_code( $promo_code, $event_id, $gross );
+      if ( ! empty( $discount_row['error'] ) ) {
+        return array( 'success' => false, 'message' => $discount_row['error'] );
+      }
+      $discount_amount = floatval( $discount_row['discount_amount'] ?? 0 );
+    }
+
+    $net = max( 0, round( $gross - $discount_amount, 2 ) );
+
+    $wpdb->query( 'START TRANSACTION' );
+
+    try {
+      $lock = $wpdb->get_row(
+        $wpdb->prepare(
+          // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- FOR UPDATE requires literal SQL.
+          "SELECT id, quantity_total, quantity_sold FROM {$wpdb->prefix}eggplant_ticket_types WHERE id = %d FOR UPDATE",
+          $ticket_type_id
+        ),
+        ARRAY_A
+      );
+
+      if ( ! $lock || ( intval( $lock['quantity_total'] ) - intval( $lock['quantity_sold'] ) ) < $quantity ) {
+        $wpdb->query( 'ROLLBACK' );
+        return array( 'success' => false, 'message' => __( 'Tickets sold out while processing. Please retry.', 'eggplant' ) );
+      }
+
+      if ( $discount_row && ! empty( $discount_row['id'] ) ) {
+        $discount_lock = $wpdb->get_row(
+          $wpdb->prepare(
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- FOR UPDATE requires literal SQL.
+            "SELECT * FROM {$wpdb->prefix}eggplant_discount_codes WHERE id = %d FOR UPDATE",
+            intval( $discount_row['id'] )
+          ),
+          ARRAY_A
+        );
+
+        if ( ! $discount_lock ) {
+          $wpdb->query( 'ROLLBACK' );
+          return array( 'success' => false, 'message' => __( 'Discount code is no longer available.', 'eggplant' ) );
+        }
+
+        $recheck = self::validate_discount_code( $promo_code, $event_id, $gross, $discount_lock );
+        if ( ! empty( $recheck['error'] ) ) {
+          $wpdb->query( 'ROLLBACK' );
+          return array( 'success' => false, 'message' => $recheck['error'] );
+        }
+        $discount_amount = floatval( $recheck['discount_amount'] ?? 0 );
+        $net = max( 0, round( $gross - $discount_amount, 2 ) );
+      }
+
+      $order_number = strtoupper( wp_generate_password( 12, false, false ) );
+      $order_access_key = wp_generate_password( 32, false, false );
+      $insert_order = $wpdb->insert(
+        $wpdb->prefix . 'eggplant_ticket_orders',
+        array(
+          'event_id'         => $event_id,
+          'order_number'     => $order_number,
+          'order_access_key' => $order_access_key,
+          'buyer_name'       => sanitize_text_field( $buyer_name ),
+          'buyer_email'      => sanitize_email( $buyer_email ),
+          'gross_amount'     => $gross,
+          'discount_amount'  => $discount_amount,
+          'net_amount'       => $net,
+          'discount_code'    => strtoupper( sanitize_text_field( $promo_code ) ),
+          'payment_status'   => 'paid',
+        ),
+        array( '%d', '%s', '%s', '%s', '%s', '%f', '%f', '%f', '%s', '%s' )
+      );
+
+      if ( ! $insert_order ) {
+        $wpdb->query( 'ROLLBACK' );
+        return array( 'success' => false, 'message' => __( 'Could not create ticket order.', 'eggplant' ) );
+      }
+
+      $order_id = intval( $wpdb->insert_id );
+      for ( $i = 0; $i < $quantity; $i++ ) {
+        $ticket_code = 'TKT-' . strtoupper( wp_generate_password( 10, false, false ) );
+        $barcode = 'EGP-' . $event_id . '-' . strtoupper( wp_generate_password( 16, false, false ) );
+
+        $ok = $wpdb->insert(
+          $wpdb->prefix . 'eggplant_tickets',
+          array(
+            'order_id'       => $order_id,
+            'event_id'       => $event_id,
+            'ticket_type_id' => $ticket_type_id,
+            'ticket_code'    => $ticket_code,
+            'barcode_value'  => $barcode,
+            'ticket_status'  => 'valid',
+          ),
+          array( '%d', '%d', '%d', '%s', '%s', '%s' )
+        );
+
+        if ( ! $ok ) {
+          $wpdb->query( 'ROLLBACK' );
+          return array( 'success' => false, 'message' => __( 'Could not issue tickets.', 'eggplant' ) );
+        }
+      }
+
+      $update_stock = $wpdb->query(
+        $wpdb->prepare(
+          "UPDATE {$wpdb->prefix}eggplant_ticket_types SET quantity_sold = quantity_sold + %d WHERE id = %d",
+          $quantity,
+          $ticket_type_id
+        )
+      );
+
+      if ( false === $update_stock ) {
+        $wpdb->query( 'ROLLBACK' );
+        return array( 'success' => false, 'message' => __( 'Could not update ticket inventory.', 'eggplant' ) );
+      }
+
+      if ( $discount_row && ! empty( $discount_row['id'] ) ) {
+        $wpdb->query(
+          $wpdb->prepare(
+            "UPDATE {$wpdb->prefix}eggplant_discount_codes SET used_count = used_count + 1 WHERE id = %d",
+            intval( $discount_row['id'] )
+          )
+        );
+      }
+
+      $wpdb->query( 'COMMIT' );
+      return array(
+        'success'          => true,
+        'order_number'     => $order_number,
+        'order_access_key' => $order_access_key,
+      );
+    } catch ( Exception $e ) {
+      $wpdb->query( 'ROLLBACK' );
+      return array( 'success' => false, 'message' => __( 'Unexpected purchase error.', 'eggplant' ) );
+    }
+  }
+
+  /**
+   * Validate and evaluate a discount code.
+   *
+   * @return array<string,mixed>
+   */
+  private static function validate_discount_code( string $code, int $event_id, float $gross, ?array $existing_row = null ): array {
+    global $wpdb;
+
+    $row = $existing_row;
+    if ( ! $row ) {
+      $row = $wpdb->get_row(
+        $wpdb->prepare(
+          "SELECT * FROM {$wpdb->prefix}eggplant_discount_codes WHERE code = %s LIMIT 1",
+          strtoupper( sanitize_text_field( $code ) )
+        ),
+        ARRAY_A
+      );
+    }
+
+    if ( ! $row ) {
+      return array( 'error' => __( 'Promo code was not found.', 'eggplant' ) );
+    }
+
+    if ( ! intval( $row['active'] ) ) {
+      return array( 'error' => __( 'Promo code is inactive.', 'eggplant' ) );
+    }
+
+    if ( ! empty( $row['event_id'] ) && intval( $row['event_id'] ) !== $event_id ) {
+      return array( 'error' => __( 'Promo code is not valid for this event.', 'eggplant' ) );
+    }
+
+    $today = current_time( 'Y-m-d' );
+    if ( ! empty( $row['start_date'] ) && $row['start_date'] > $today ) {
+      return array( 'error' => __( 'Promo code is not active yet.', 'eggplant' ) );
+    }
+
+    if ( ! empty( $row['end_date'] ) && $row['end_date'] < $today ) {
+      return array( 'error' => __( 'Promo code has expired.', 'eggplant' ) );
+    }
+
+    if ( intval( $row['max_uses'] ) > 0 && intval( $row['used_count'] ) >= intval( $row['max_uses'] ) ) {
+      return array( 'error' => __( 'Promo code usage limit has been reached.', 'eggplant' ) );
+    }
+
+    $discount = 0.00;
+    if ( 'fixed' === $row['discount_type'] ) {
+      $discount = min( $gross, max( 0, floatval( $row['discount_value'] ) ) );
+    } else {
+      $percent = max( 0, min( 100, floatval( $row['discount_value'] ) ) );
+      $discount = round( $gross * ( $percent / 100 ), 2 );
+    }
+
+    return array(
+      'id'              => intval( $row['id'] ),
+      'discount_amount' => $discount,
+      'row'             => $row,
+    );
+  }
+
+  /**
+   * Scan a ticket barcode and enforce one-time use.
+   *
+   * @return array<string,mixed>
+   */
+  public static function scan_ticket_barcode( string $barcode_value, int $user_id = 0 ): array {
+    global $wpdb;
+
+    $barcode = sanitize_text_field( $barcode_value );
+    if ( '' === $barcode ) {
+      return array( 'success' => false, 'message' => __( 'Barcode is required.', 'eggplant' ) );
+    }
+
+    $wpdb->query( 'START TRANSACTION' );
+
+    try {
+      $ticket = $wpdb->get_row(
+        $wpdb->prepare(
+          // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- FOR UPDATE requires literal SQL.
+          "SELECT * FROM {$wpdb->prefix}eggplant_tickets WHERE barcode_value = %s LIMIT 1 FOR UPDATE",
+          $barcode
+        ),
+        ARRAY_A
+      );
+
+      if ( ! $ticket ) {
+        self::insert_scan_log( null, null, $barcode, 'invalid', __( 'Ticket was not found.', 'eggplant' ), $user_id );
+        $wpdb->query( 'COMMIT' );
+        return array( 'success' => false, 'message' => __( 'Ticket not found.', 'eggplant' ) );
+      }
+
+      if ( 'used' === $ticket['ticket_status'] ) {
+        self::insert_scan_log( intval( $ticket['id'] ), intval( $ticket['event_id'] ), $barcode, 'duplicate', __( 'Duplicate scan blocked: ticket already used.', 'eggplant' ), $user_id );
+        $wpdb->query( 'COMMIT' );
+        return array( 'success' => false, 'message' => __( 'Duplicate scan blocked: ticket already used.', 'eggplant' ) );
+      }
+
+      $updated = $wpdb->update(
+        $wpdb->prefix . 'eggplant_tickets',
+        array(
+          'ticket_status' => 'used',
+          'scanned_at'    => current_time( 'mysql' ),
+          'scanned_by'    => $user_id ?: null,
+        ),
+        array(
+          'id'            => intval( $ticket['id'] ),
+          'ticket_status' => 'valid',
+        ),
+        array( '%s', '%s', '%d' ),
+        array( '%d', '%s' )
+      );
+
+      if ( ! $updated ) {
+        self::insert_scan_log( intval( $ticket['id'] ), intval( $ticket['event_id'] ), $barcode, 'duplicate', __( 'Duplicate scan blocked: ticket already used.', 'eggplant' ), $user_id );
+        $wpdb->query( 'COMMIT' );
+        return array( 'success' => false, 'message' => __( 'Duplicate scan blocked: ticket already used.', 'eggplant' ) );
+      }
+
+      self::insert_scan_log( intval( $ticket['id'] ), intval( $ticket['event_id'] ), $barcode, 'accepted', __( 'Ticket accepted.', 'eggplant' ), $user_id );
+      $wpdb->query( 'COMMIT' );
+      return array( 'success' => true, 'message' => __( 'Ticket accepted. Entry granted.', 'eggplant' ) );
+    } catch ( Exception $e ) {
+      $wpdb->query( 'ROLLBACK' );
+      return array( 'success' => false, 'message' => __( 'Scan error. Please retry.', 'eggplant' ) );
+    }
+  }
+
+  private static function insert_scan_log( ?int $ticket_id, ?int $event_id, string $barcode, string $status, string $message, int $user_id = 0 ): void {
+    global $wpdb;
+    $wpdb->insert(
+      $wpdb->prefix . 'eggplant_ticket_scans',
+      array(
+        'ticket_id'     => $ticket_id,
+        'event_id'      => $event_id,
+        'barcode_value' => sanitize_text_field( $barcode ),
+        'scan_status'   => sanitize_key( $status ),
+        'scan_message'  => sanitize_text_field( $message ),
+        'scanned_by'    => $user_id ?: null,
+      ),
+      array( '%d', '%d', '%s', '%s', '%s', '%d' )
+    );
+  }
+
+  /**
+   * @return array<int,array<string,mixed>>
+   */
+  public static function get_ticket_orders(): array {
+    global $wpdb;
+    $rows = $wpdb->get_results(
+      // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- table names use internal prefix only.
+      "SELECT o.*, e.title AS event_title
+        FROM {$wpdb->prefix}eggplant_ticket_orders o
+        INNER JOIN {$wpdb->prefix}eggplant_events e ON e.id = o.event_id
+        ORDER BY o.created_at DESC, o.id DESC",
+      ARRAY_A
+    );
+
+    return $rows ?: array();
+  }
+
+  /**
+   * @return array<int,array<string,mixed>>
+   */
+  public static function get_tickets_for_order_number( string $order_number ): array {
+    global $wpdb;
+    $rows = $wpdb->get_results(
+      $wpdb->prepare(
+        "SELECT t.*, o.order_number, e.title AS event_title, tt.ticket_name
+          FROM {$wpdb->prefix}eggplant_tickets t
+          INNER JOIN {$wpdb->prefix}eggplant_ticket_orders o ON o.id = t.order_id
+          INNER JOIN {$wpdb->prefix}eggplant_events e ON e.id = t.event_id
+          INNER JOIN {$wpdb->prefix}eggplant_ticket_types tt ON tt.id = t.ticket_type_id
+          WHERE o.order_number = %s
+          ORDER BY t.id ASC",
+        sanitize_text_field( $order_number )
+      ),
+      ARRAY_A
+    );
+
+    return $rows ?: array();
+  }
+
+  /**
+   * @return array<string,mixed>|null
+   */
+  public static function get_ticket_order_by_public_key( string $order_number, string $order_key ): ?array {
+    global $wpdb;
+
+    $row = $wpdb->get_row(
+      $wpdb->prepare(
+        "SELECT * FROM {$wpdb->prefix}eggplant_ticket_orders WHERE order_number = %s AND order_access_key = %s LIMIT 1",
+        sanitize_text_field( $order_number ),
+        sanitize_text_field( $order_key )
+      ),
+      ARRAY_A
+    );
+
+    return $row ?: null;
+  }
+
+  /**
+   * @return array<int,array<string,mixed>>
+   */
+  public static function get_ticket_scan_logs( int $limit = 200 ): array {
+    global $wpdb;
+    $rows = $wpdb->get_results(
+      $wpdb->prepare(
+        "SELECT s.*, e.title AS event_title, u.display_name AS scanned_by_name
+          FROM {$wpdb->prefix}eggplant_ticket_scans s
+          LEFT JOIN {$wpdb->prefix}eggplant_events e ON e.id = s.event_id
+          LEFT JOIN {$wpdb->users} u ON u.ID = s.scanned_by
+          ORDER BY s.created_at DESC, s.id DESC
+          LIMIT %d",
+        max( 1, $limit )
+      ),
+      ARRAY_A
+    );
+
+    return $rows ?: array();
+  }
+
+  /**
+   * @return int|false
+   */
+  public static function insert_event_settlement( array $data ) {
+    global $wpdb;
+
+    $result = $wpdb->insert(
+      $wpdb->prefix . 'eggplant_event_settlements',
+      array(
+        'event_id'                 => intval( $data['event_id'] ?? 0 ),
+        'adjustment_amount'        => floatval( $data['adjustment_amount'] ?? 0 ),
+        'adjustment_note'          => sanitize_text_field( $data['adjustment_note'] ?? '' ),
+        'organizer_split_override' => isset( $data['organizer_split_override'] ) && null !== $data['organizer_split_override'] ? floatval( $data['organizer_split_override'] ) : null,
+        'created_by'               => ! empty( $data['created_by'] ) ? intval( $data['created_by'] ) : null,
+      ),
+      array( '%d', '%f', '%s', '%f', '%d' )
+    );
+
+    return $result ? $wpdb->insert_id : false;
+  }
+
+  /**
+   * @return array<int,array<string,mixed>>
+   */
+  public static function get_event_settlements( int $limit = 200 ): array {
+    global $wpdb;
+
+    $rows = $wpdb->get_results(
+      $wpdb->prepare(
+        "SELECT s.*, e.title AS event_title, u.display_name AS created_by_name
+          FROM {$wpdb->prefix}eggplant_event_settlements s
+          INNER JOIN {$wpdb->prefix}eggplant_events e ON e.id = s.event_id
+          LEFT JOIN {$wpdb->users} u ON u.ID = s.created_by
+          ORDER BY s.created_at DESC, s.id DESC
+          LIMIT %d",
+        max( 1, $limit )
+      ),
+      ARRAY_A
+    );
+
+    return $rows ?: array();
+  }
+
+  /**
+   * Aggregate top-level ticketing totals.
+   *
+   * @return array<string,mixed>
+   */
+  public static function get_ticketing_totals(): array {
+    global $wpdb;
+
+    $order_totals = $wpdb->get_row(
+      // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- internal table name only.
+      "SELECT COUNT(*) AS orders_count, COALESCE(SUM(net_amount),0) AS net_total FROM {$wpdb->prefix}eggplant_ticket_orders",
+      ARRAY_A
+    );
+
+    $ticket_totals = $wpdb->get_row(
+      // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- internal table name only.
+      "SELECT COUNT(*) AS tickets_count, COALESCE(SUM(CASE WHEN ticket_status = 'used' THEN 1 ELSE 0 END),0) AS used_tickets FROM {$wpdb->prefix}eggplant_tickets",
+      ARRAY_A
+    );
+
+    return array(
+      'orders_count' => intval( $order_totals['orders_count'] ?? 0 ),
+      'net_total'    => floatval( $order_totals['net_total'] ?? 0 ),
+      'tickets_count'=> intval( $ticket_totals['tickets_count'] ?? 0 ),
+      'used_tickets' => intval( $ticket_totals['used_tickets'] ?? 0 ),
+    );
+  }
+
+  /**
+   * @return array<int,array<string,mixed>>
+   */
+  public static function get_ticketing_event_accounting_rows(): array {
+    global $wpdb;
+
+    $rows = $wpdb->get_results(
+      // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- internal table names only.
+      "SELECT
+         e.id AS event_id,
+         e.title AS event_title,
+         e.organizer_split_percent,
+         COALESCE(SUM(o.gross_amount),0) AS gross_amount,
+         COALESCE(SUM(o.discount_amount),0) AS discount_amount,
+         COALESCE(SUM(o.net_amount),0) AS net_amount
+       FROM {$wpdb->prefix}eggplant_events e
+       LEFT JOIN {$wpdb->prefix}eggplant_ticket_orders o ON o.event_id = e.id
+       GROUP BY e.id
+       ORDER BY e.sort_order ASC, e.id ASC",
+      ARRAY_A
+    );
+
+    if ( ! $rows ) {
+      return array();
+    }
+
+    $settlements = self::get_event_settlement_rollups();
+
+    foreach ( $rows as &$row ) {
+      $event_id = intval( $row['event_id'] );
+      $settlement = $settlements[ $event_id ] ?? array(
+        'adjustment_amount' => 0,
+        'organizer_override' => null,
+      );
+      $net = floatval( $row['net_amount'] );
+      $percent = null !== $settlement['organizer_override'] ? floatval( $settlement['organizer_override'] ) : floatval( $row['organizer_split_percent'] );
+      $base_share = round( $net * ( max( 0, min( 100, $percent ) ) / 100 ), 2 );
+      $organizer_share = round( $base_share + floatval( $settlement['adjustment_amount'] ), 2 );
+      $venue_share = round( $net - $organizer_share, 2 );
+
+      $row['organizer_percent'] = $percent;
+      $row['organizer_share'] = $organizer_share;
+      $row['venue_share'] = $venue_share;
+    }
+
+    return $rows;
+  }
+
+  /**
+   * @return array<int,array<string,mixed>>
+   */
+  private static function get_event_settlement_rollups(): array {
+    global $wpdb;
+
+    $rows = $wpdb->get_results(
+      // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- internal table names only.
+      "SELECT
+        event_id,
+        COALESCE(SUM(adjustment_amount),0) AS adjustment_amount,
+        MAX(id) AS latest_id
+      FROM {$wpdb->prefix}eggplant_event_settlements
+      GROUP BY event_id",
+      ARRAY_A
+    );
+
+    $result = array();
+    foreach ( $rows ?: array() as $row ) {
+      $event_id = intval( $row['event_id'] );
+      $latest_override = $wpdb->get_var(
+        $wpdb->prepare(
+          "SELECT organizer_split_override FROM {$wpdb->prefix}eggplant_event_settlements WHERE id = %d LIMIT 1",
+          intval( $row['latest_id'] )
+        )
+      );
+      $result[ $event_id ] = array(
+        'adjustment_amount' => floatval( $row['adjustment_amount'] ),
+        'organizer_override'=> ( null === $latest_override || '' === $latest_override ) ? null : floatval( $latest_override ),
+      );
+    }
+
+    return $result;
+  }
 }

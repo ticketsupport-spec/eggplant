@@ -32,6 +32,8 @@ class Eggplant_Settings {
       'show_booking_form' => 1,
       'staff_tasks_url'   => '',
       'staff_clock_url'   => '',
+      'box_office_url'    => '',
+      'ticket_scanner_url'=> '',
     );
     $saved = get_option( 'eggplant_settings', array() );
     return wp_parse_args( (array) $saved, $defaults );

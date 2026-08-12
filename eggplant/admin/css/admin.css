@@ -179,3 +179,14 @@
 .eg-admin .description {
   margin-top: .35rem;
 }
+
+
+/* Ticketing */
+.eg-admin code {
+  font-size: .88em;
+  word-break: break-all;
+}
+
+.eg-admin .eg-card .button + .button {
+  margin-left: .5rem;
+}
