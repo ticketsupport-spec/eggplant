@@ -206,8 +206,12 @@ class Eggplant_Operations {
    *
    * @param array<int,array<string,mixed>> $tasks
    * @param string                         $button_class CSS class(es) for the submit button.
+   * @param string                         $redirect_url URL to redirect to after completing a task.
    */
-  private static function render_task_items( array $tasks, string $button_class = 'eg-btn eg-btn--primary' ): string {
+  private static function render_task_items( array $tasks, string $button_class = 'eg-btn eg-btn--primary', string $redirect_url = '' ): string {
+    if ( '' === $redirect_url ) {
+      $redirect_url = self::get_current_url();
+    }
 
     // Attach status and sort: overdue first, then by next_due_at ascending.
     $decorated = array();
@@ -244,7 +248,7 @@ class Eggplant_Operations {
           <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="eg-ops-complete-form">
             <input type="hidden" name="action" value="eggplant_complete_task">
             <input type="hidden" name="task_id" value="<?php echo esc_attr( $task['id'] ); ?>">
-            <input type="hidden" name="redirect_to" value="<?php echo esc_url( self::get_current_url() ); ?>">
+            <input type="hidden" name="redirect_to" value="<?php echo esc_url( $redirect_url ); ?>">
             <?php wp_nonce_field( 'eggplant_complete_task_' . $task['id'], 'eggplant_complete_task_nonce' ); ?>
             <input type="hidden" name="staff_identifier" class="eg-ops-staff-mirror" value="">
             <button type="submit" class="<?php echo esc_attr( $button_class ); ?>"><?php esc_html_e( 'Mark Complete', 'eggplant' ); ?></button>
@@ -261,8 +265,9 @@ class Eggplant_Operations {
    */
   public static function ajax_refresh_tasks(): void {
     check_ajax_referer( 'eggplant_refresh_tasks', 'nonce' );
-    $tasks = Eggplant_DB::get_active_tasks();
-    wp_send_json_success( self::render_task_items( $tasks, 'eg-btn eg-btn--primary' ) );
+    $tasks        = Eggplant_DB::get_active_tasks();
+    $redirect_url = esc_url_raw( wp_unslash( $_POST['page_url'] ?? '' ) );
+    wp_send_json_success( self::render_task_items( $tasks, 'eg-btn eg-btn--primary', $redirect_url ) );
   }
 
   /**

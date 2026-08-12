@@ -291,8 +291,9 @@
 
     function refreshTasks() {
       $.post(ajaxUrl, {
-        action: 'eggplant_refresh_tasks',
-        nonce:  tasksRefreshNonce
+        action:   'eggplant_refresh_tasks',
+        nonce:    tasksRefreshNonce,
+        page_url: window.location.href
       }).done(function (res) {
         if (res.success && res.data) {
           tasksList.innerHTML = res.data;
