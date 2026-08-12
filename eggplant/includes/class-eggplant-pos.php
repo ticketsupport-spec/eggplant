@@ -17,10 +17,12 @@ class Eggplant_POS {
     add_shortcode( 'eggplant_pos', array( __CLASS__, 'render_pos_shortcode' ) );
 
     // AJAX for public POS terminal.
-    add_action( 'wp_ajax_eggplant_pos_get_items',   array( __CLASS__, 'ajax_get_items' ) );
+    // Item listing is open to any logged-in user; sale processing requires the
+    // user to be logged in (any subscriber-level capability) to prevent
+    // unauthenticated visitors from writing sales or decrementing stock.
+    add_action( 'wp_ajax_eggplant_pos_get_items',    array( __CLASS__, 'ajax_get_items' ) );
     add_action( 'wp_ajax_eggplant_pos_process_sale', array( __CLASS__, 'ajax_process_sale' ) );
-    add_action( 'wp_ajax_nopriv_eggplant_pos_get_items',   array( __CLASS__, 'ajax_get_items' ) );
-    add_action( 'wp_ajax_nopriv_eggplant_pos_process_sale', array( __CLASS__, 'ajax_process_sale' ) );
+    add_action( 'wp_ajax_nopriv_eggplant_pos_get_items', array( __CLASS__, 'ajax_get_items' ) );
 
     // AJAX for admin POS pages.
     add_action( 'wp_ajax_eggplant_pos_save_item',   array( __CLASS__, 'ajax_save_item' ) );
@@ -199,6 +201,9 @@ class Eggplant_POS {
   public static function record_sale( array $sale_data, array $line_items ) {
     global $wpdb;
 
+    // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+    $wpdb->query( 'START TRANSACTION' );
+
     $result = $wpdb->insert(
       $wpdb->prefix . 'eggplant_pos_sales',
       array(
@@ -215,6 +220,8 @@ class Eggplant_POS {
     );
 
     if ( ! $result ) {
+      // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+      $wpdb->query( 'ROLLBACK' );
       return false;
     }
 
@@ -224,7 +231,7 @@ class Eggplant_POS {
       $item_id = intval( $line['item_id'] );
       $qty     = max( 1, intval( $line['qty'] ) );
 
-      $wpdb->insert(
+      $line_result = $wpdb->insert(
         $wpdb->prefix . 'eggplant_pos_sale_items',
         array(
           'sale_id'    => $sale_id,
@@ -240,8 +247,14 @@ class Eggplant_POS {
         array( '%d', '%d', '%s', '%d', '%f', '%f', '%f', '%f', '%f' )
       );
 
+      if ( ! $line_result ) {
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $wpdb->query( 'ROLLBACK' );
+        return false;
+      }
+
       // Reduce stock.
-      $wpdb->query(
+      $stock_result = $wpdb->query(
         $wpdb->prepare(
           "UPDATE {$wpdb->prefix}eggplant_pos_items
              SET stock_quantity = GREATEST(0, stock_quantity - %d),
@@ -252,8 +265,16 @@ class Eggplant_POS {
           $item_id
         )
       );
+
+      if ( $stock_result === false ) {
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $wpdb->query( 'ROLLBACK' );
+        return false;
+      }
     }
 
+    // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+    $wpdb->query( 'COMMIT' );
     return $sale_id;
   }
 
@@ -263,7 +284,7 @@ class Eggplant_POS {
    * @param string $period  'day' | 'week' | 'month' | 'year'
    * @param string $from    Y-m-d
    * @param string $to      Y-m-d
-   * @return array<string,mixed>  Keys: rows (grouped), totals, profit
+   * @return array<string,mixed>  Keys: rows (grouped by period), totals (aggregate sums)
    */
   public static function get_sales_report( string $period, string $from, string $to ): array {
     global $wpdb;
@@ -375,6 +396,10 @@ class Eggplant_POS {
   public static function ajax_process_sale(): void {
     check_ajax_referer( 'eggplant_pos_nonce', 'nonce' );
 
+    if ( ! is_user_logged_in() ) {
+      wp_send_json_error( __( 'You must be logged in to process a sale.', 'eggplant' ) );
+    }
+
     $raw_items = isset( $_POST['items'] ) ? wp_unslash( $_POST['items'] ) : array();
     if ( ! is_array( $raw_items ) || empty( $raw_items ) ) {
       wp_send_json_error( __( 'No items in cart.', 'eggplant' ) );
@@ -395,6 +420,11 @@ class Eggplant_POS {
       $item = self::get_item( $item_id );
       if ( ! $item || ! $item['active'] ) {
         wp_send_json_error( __( 'Invalid item in cart.', 'eggplant' ) );
+      }
+
+      if ( (int) $item['stock_quantity'] < $qty ) {
+        /* translators: %s: item name */
+        wp_send_json_error( sprintf( __( '"%s" does not have enough stock to complete this sale.', 'eggplant' ), $item['name'] ) );
       }
 
       $unit_price = (float) $item['price'];
