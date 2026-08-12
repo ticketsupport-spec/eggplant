@@ -14,6 +14,8 @@ class Eggplant_Ticketing {
 
     add_action( 'admin_menu', array( __CLASS__, 'add_admin_menus' ) );
 
+    add_action( 'template_redirect', array( __CLASS__, 'redirect_pretty_admin_urls' ) );
+
     add_action( 'admin_post_eggplant_ticket_purchase', array( __CLASS__, 'handle_ticket_purchase' ) );
     add_action( 'admin_post_nopriv_eggplant_ticket_purchase', array( __CLASS__, 'handle_ticket_purchase' ) );
     add_action( 'admin_post_eggplant_ticket_scan', array( __CLASS__, 'handle_ticket_scan' ) );
@@ -22,6 +24,36 @@ class Eggplant_Ticketing {
     add_action( 'admin_post_eggplant_ticket_save_discount', array( __CLASS__, 'handle_save_discount_code' ) );
     add_action( 'admin_post_eggplant_ticket_save_settlement', array( __CLASS__, 'handle_save_settlement' ) );
     add_action( 'admin_post_eggplant_ticket_save_event_settings', array( __CLASS__, 'handle_save_event_settings' ) );
+  }
+
+  /**
+   * Redirects pretty wp-admin URLs like /wp-admin/eggplant-ticketing-dashboard
+   * to the real admin page URL (admin.php?page=...).
+   *
+   * With "Post name" permalinks WordPress routes unknown paths through index.php,
+   * so these requests reach this hook before WordPress serves a 404.
+   *
+   * @since 1.3.0
+   */
+  public static function redirect_pretty_admin_urls(): void {
+    $slugs = array(
+      'eggplant-ticketing-dashboard',
+      'eggplant-ticketing-events',
+      'eggplant-ticketing-discounts',
+      'eggplant-ticketing-orders',
+      'eggplant-ticketing-scans',
+      'eggplant-ticketing-settlements',
+    );
+
+    $request = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( strtok( wp_unslash( $_SERVER['REQUEST_URI'] ), '?' ) ) : '';
+    $request = trailingslashit( $request );
+
+    foreach ( $slugs as $slug ) {
+      if ( '/wp-admin/' . $slug . '/' === $request ) {
+        wp_safe_redirect( admin_url( 'admin.php?page=' . $slug ), 302 );
+        exit;
+      }
+    }
   }
 
   public static function add_admin_menus(): void {
