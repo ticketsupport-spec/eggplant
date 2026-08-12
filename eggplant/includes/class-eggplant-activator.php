@@ -32,39 +32,6 @@ class Eggplant_Activator {
       self::set_default_settings();
     }
     flush_rewrite_rules();
-    self::write_htaccess_rules();
-  }
-
-  /**
-   * Inserts Apache rewrite rules into .htaccess so that pretty wp-admin
-   * URLs like /wp-admin/eggplant-ticketing-dashboard resolve correctly.
-   *
-   * @since 1.3.0
-   */
-  public static function write_htaccess_rules(): void {
-    $htaccess = get_home_path() . '.htaccess';
-
-    $slugs = array(
-      'eggplant-ticketing-dashboard',
-      'eggplant-ticketing-events',
-      'eggplant-ticketing-discounts',
-      'eggplant-ticketing-orders',
-      'eggplant-ticketing-scans',
-      'eggplant-ticketing-settlements',
-    );
-
-    $lines = array(
-      '<IfModule mod_rewrite.c>',
-      'RewriteEngine On',
-      'RewriteBase /',
-    );
-    foreach ( $slugs as $slug ) {
-      $safe_slug = sanitize_key( $slug );
-      $lines[]   = 'RewriteRule ^wp-admin/' . preg_quote( $safe_slug, null ) . '$ /wp-admin/admin.php?page=' . rawurlencode( $safe_slug ) . ' [R=302,L,QSA]';
-    }
-    $lines[] = '</IfModule>';
-
-    insert_with_markers( $htaccess, 'Eggplant', $lines );
   }
 
   /**
