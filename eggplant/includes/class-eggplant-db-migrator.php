@@ -29,6 +29,12 @@ class Eggplant_DB_Migrator {
     'eggplant_staff_checkins',
     'eggplant_payroll_periods',
     'eggplant_payroll_entries',
+    'eggplant_ticket_types',
+    'eggplant_ticket_orders',
+    'eggplant_tickets',
+    'eggplant_ticket_scans',
+    'eggplant_discount_codes',
+    'eggplant_event_settlements',
   );
 
   /**

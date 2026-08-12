@@ -114,7 +114,7 @@ class Eggplant_Frontend {
       return false;
     }
 
-    return has_shortcode( $post->post_content, 'eggplant_tasks' ) || has_shortcode( $post->post_content, 'eggplant_staff_clock' );
+    return has_shortcode( $post->post_content, 'eggplant_tasks' ) || has_shortcode( $post->post_content, 'eggplant_staff_clock' ) || has_shortcode( $post->post_content, 'eggplant_box_office' ) || has_shortcode( $post->post_content, 'eggplant_ticket_scanner' );
   }
 
   /**
