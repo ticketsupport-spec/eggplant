@@ -692,9 +692,14 @@ class Eggplant_POS {
           <div class="eg-pos__receipt" id="eg-pos-receipt" style="display:none;">
             <h3><?php esc_html_e( 'Sale Complete', 'eggplant' ); ?></h3>
             <div id="eg-pos-receipt-details"></div>
-            <button class="button button-primary" id="eg-pos-btn-new-sale">
-              <?php esc_html_e( 'New Sale', 'eggplant' ); ?>
-            </button>
+            <div class="eg-pos__receipt-actions">
+              <button class="button" id="eg-pos-btn-print-receipt" onclick="window.print()">
+                <?php esc_html_e( 'Print Receipt', 'eggplant' ); ?>
+              </button>
+              <button class="button button-primary" id="eg-pos-btn-new-sale">
+                <?php esc_html_e( 'New Sale', 'eggplant' ); ?>
+              </button>
+            </div>
           </div>
 
           <div id="eg-pos-msg" class="eg-msg" style="display:none;"></div>
@@ -840,12 +845,22 @@ class Eggplant_POS {
           if(res.success){
             var d = res.data;
             var html = '<table class="eg-pos__receipt-table">';
-            html += '<tr><th><?php echo esc_js( __('Subtotal','eggplant') ); ?></th><td>'+fmt(d.subtotal)+'</td></tr>';
-            html += '<tr><th><?php echo esc_js( __('Tax','eggplant') ); ?></th><td>'+fmt(d.tax)+'</td></tr>';
-            html += '<tr><th><?php echo esc_js( __('Total','eggplant') ); ?></th><td>'+fmt(d.total)+'</td></tr>';
+            html += '<thead><tr><th><?php echo esc_js( __('Item','eggplant') ); ?></th><th><?php echo esc_js( __('Qty','eggplant') ); ?></th><th><?php echo esc_js( __('Unit','eggplant') ); ?></th><th><?php echo esc_js( __('Line','eggplant') ); ?></th></tr></thead>';
+            html += '<tbody>';
+            $.each(cart, function(id, row){
+              var qty = parseInt(row.qty, 10);
+              var net = row.price * qty;
+              html += '<tr><td>'+$('<span>').text(row.name).html()+'</td><td>'+qty+'</td><td>'+fmt(row.price)+'</td><td>'+fmt(net)+'</td></tr>';
+            });
+            html += '</tbody>';
+            html += '<tfoot>';
+            html += '<tr><th colspan="3"><?php echo esc_js( __('Subtotal','eggplant') ); ?></th><td>'+fmt(d.subtotal)+'</td></tr>';
+            html += '<tr><th colspan="3"><?php echo esc_js( __('Tax','eggplant') ); ?></th><td>'+fmt(d.tax)+'</td></tr>';
+            html += '<tr class="eg-pos__receipt-total"><th colspan="3"><?php echo esc_js( __('Total','eggplant') ); ?></th><td>'+fmt(d.total)+'</td></tr>';
             if(method==='cash' && d.change>0){
-              html += '<tr><th><?php echo esc_js( __('Change','eggplant') ); ?></th><td>'+fmt(d.change)+'</td></tr>';
+              html += '<tr><th colspan="3"><?php echo esc_js( __('Change','eggplant') ); ?></th><td>'+fmt(d.change)+'</td></tr>';
             }
+            html += '</tfoot>';
             html += '</table>';
             $('#eg-pos-receipt-details').html(html);
             $('#eg-pos-actions').hide();

@@ -128,12 +128,45 @@ class Eggplant_Ticketing {
       <?php if ( $order_number && $order_key ) : ?>
         <?php $order = Eggplant_DB::get_ticket_order_by_public_key( $order_number, $order_key ); ?>
         <?php if ( $order ) : ?>
+          <?php $receipt_tickets = Eggplant_DB::get_tickets_for_order_number( $order['order_number'] ); ?>
+          <?php $receipt_qty = count( $receipt_tickets ); ?>
+          <?php $receipt_event  = ! empty( $receipt_tickets ) ? $receipt_tickets[0]['event_title'] : ''; ?>
+          <?php $receipt_type   = ! empty( $receipt_tickets ) ? $receipt_tickets[0]['ticket_name'] : ''; ?>
+          <?php $unit_price = $receipt_qty > 0 ? round( (float) $order['gross_amount'] / $receipt_qty, 2 ) : (float) $order['gross_amount']; ?>
           <div class="eg-ticket-receipt">
             <h3><?php esc_html_e( 'Order Confirmation', 'eggplant' ); ?> #<?php echo esc_html( $order['order_number'] ); ?></h3>
-            <p><?php echo esc_html( sprintf( __( 'Total Paid: %s', 'eggplant' ), self::format_money( $order['net_amount'] ) ) ); ?></p>
-            <p>
+            <table class="eg-ticket-receipt__table">
+              <tbody>
+                <?php if ( $order['buyer_name'] ) : ?>
+                <tr><th><?php esc_html_e( 'Buyer', 'eggplant' ); ?></th><td><?php echo esc_html( $order['buyer_name'] ); ?></td></tr>
+                <?php endif; ?>
+                <?php if ( $receipt_event ) : ?>
+                <tr><th><?php esc_html_e( 'Event', 'eggplant' ); ?></th><td><?php echo esc_html( $receipt_event ); ?></td></tr>
+                <?php endif; ?>
+                <?php if ( $receipt_type ) : ?>
+                <tr><th><?php esc_html_e( 'Ticket Type', 'eggplant' ); ?></th><td><?php echo esc_html( $receipt_type ); ?></td></tr>
+                <?php endif; ?>
+                <tr><th><?php esc_html_e( 'Quantity', 'eggplant' ); ?></th><td><?php echo esc_html( $receipt_qty ); ?></td></tr>
+                <tr><th><?php esc_html_e( 'Unit Price', 'eggplant' ); ?></th><td><?php echo esc_html( self::format_money( $unit_price ) ); ?></td></tr>
+                <?php if ( (float) $order['discount_amount'] > 0 ) : ?>
+                <tr><th><?php esc_html_e( 'Subtotal', 'eggplant' ); ?></th><td><?php echo esc_html( self::format_money( $order['gross_amount'] ) ); ?></td></tr>
+                <tr><th>
+                  <?php
+                  echo esc_html(
+                    $order['discount_code']
+                      ? sprintf( __( 'Discount (%s)', 'eggplant' ), $order['discount_code'] )
+                      : __( 'Discount', 'eggplant' )
+                  );
+                  ?>
+                </th><td>-<?php echo esc_html( self::format_money( $order['discount_amount'] ) ); ?></td></tr>
+                <?php endif; ?>
+                <tr class="eg-ticket-receipt__total"><th><?php esc_html_e( 'Total Paid', 'eggplant' ); ?></th><td><?php echo esc_html( self::format_money( $order['net_amount'] ) ); ?></td></tr>
+              </tbody>
+            </table>
+            <div class="eg-ticket-receipt__actions">
+              <button type="button" class="eg-btn" onclick="window.print()"><?php esc_html_e( 'Print Receipt', 'eggplant' ); ?></button>
               <a class="eg-btn eg-btn--primary" href="<?php echo esc_url( self::build_order_url( $order['order_number'], $order['order_access_key'], true ) ); ?>"><?php esc_html_e( 'Print Tickets', 'eggplant' ); ?></a>
-            </p>
+            </div>
           </div>
         <?php endif; ?>
       <?php endif; ?>
