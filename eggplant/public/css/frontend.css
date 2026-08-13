@@ -581,6 +581,13 @@ a:hover { text-decoration: underline; }
   border-radius: 8px;
 }
 
+.eg-ticket-receipt__table { width: 100%; border-collapse: collapse; margin-bottom: .75rem; }
+.eg-ticket-receipt__table th { text-align: left; padding: .25rem .4rem; font-weight: 600; width: 40%; }
+.eg-ticket-receipt__table td { padding: .25rem .4rem; }
+.eg-ticket-receipt__total th,
+.eg-ticket-receipt__total td { font-size: 1.1em; font-weight: bold; border-top: 1px solid currentColor; padding-top: .4rem; }
+.eg-ticket-receipt__actions { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: .75rem; }
+
 .eg-ticket-print-wrap {
   margin: 1rem 0;
 }
@@ -598,9 +605,35 @@ a:hover { text-decoration: underline; }
   .eg-admin-links,
   .eg-carousel,
   .eg-calendar-section,
-  .eg-booking-section { display: none !important; }
+  .eg-booking-section,
+  .eg-pos__items-panel,
+  .eg-pos__category-tabs,
+  .eg-pos__cart-items,
+  .eg-pos__totals,
+  .eg-pos__payment,
+  .eg-pos__actions,
+  .eg-pos__receipt-actions,
+  .eg-ticket-receipt__actions { display: none !important; }
 
   .eg-print-ticket { page-break-inside: avoid; }
+
+  /* Ensure receipt areas print with legible colours */
+  .eg-pos__receipt,
+  .eg-ticket-receipt {
+    background: #fff !important;
+    color: #000 !important;
+    border-color: #000 !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .eg-pos__receipt-table th,
+  .eg-pos__receipt-table td,
+  .eg-ticket-receipt__table th,
+  .eg-ticket-receipt__table td {
+    color: #000 !important;
+  }
 }
 
 /* ── POS Terminal ── */
@@ -642,5 +675,14 @@ a:hover { text-decoration: underline; }
 .eg-pos__receipt { background: rgba(255,255,255,.07); border-radius: 8px; padding: 1rem; text-align: center; }
 .eg-pos__receipt h3 { color: var(--eg-available, #2a9d8f); margin-bottom: .75rem; }
 .eg-pos__receipt-table { width: 100%; margin-bottom: 1rem; border-collapse: collapse; }
-.eg-pos__receipt-table th { text-align: left; padding: .2rem .4rem; font-weight: normal; color: rgba(255,255,255,.7); }
-.eg-pos__receipt-table td { text-align: right; padding: .2rem .4rem; }
+.eg-pos__receipt-table thead th { text-align: left; padding: .2rem .4rem; font-size: .8em; color: rgba(255,255,255,.5); border-bottom: 1px solid rgba(255,255,255,.2); }
+.eg-pos__receipt-table tbody td { padding: .2rem .4rem; font-size: .9em; }
+.eg-pos__receipt-table tbody td:first-child { text-align: left; }
+.eg-pos__receipt-table tbody td:not(:first-child) { text-align: right; }
+.eg-pos__receipt-table tfoot th { text-align: left; padding: .2rem .4rem; font-weight: normal; color: rgba(255,255,255,.7); }
+.eg-pos__receipt-table tfoot td { text-align: right; padding: .2rem .4rem; }
+.eg-pos__receipt-table tfoot tr:first-child th,
+.eg-pos__receipt-table tfoot tr:first-child td { border-top: 1px solid rgba(255,255,255,.2); padding-top: .4rem; }
+.eg-pos__receipt-total th,
+.eg-pos__receipt-total td { font-weight: bold; font-size: 1.05em; }
+.eg-pos__receipt-actions { display: flex; gap: .6rem; justify-content: center; margin-top: .75rem; }
