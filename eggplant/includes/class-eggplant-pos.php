@@ -693,7 +693,7 @@ class Eggplant_POS {
             <h3><?php esc_html_e( 'Sale Complete', 'eggplant' ); ?></h3>
             <div id="eg-pos-receipt-details"></div>
             <div class="eg-pos__receipt-actions">
-              <button class="button" id="eg-pos-btn-print-receipt" onclick="document.body.classList.add('eg-pos-printing');window.addEventListener('afterprint',function(){document.body.classList.remove('eg-pos-printing');},{once:true});window.print();">
+              <button class="button" id="eg-pos-btn-print-receipt">
                 <?php esc_html_e( 'Print Receipt', 'eggplant' ); ?>
               </button>
               <button class="button button-primary" id="eg-pos-btn-new-sale">
@@ -715,6 +715,31 @@ class Eggplant_POS {
       var cart    = {};
 
       function fmt(n){ return '$' + parseFloat(n).toFixed(2); }
+
+      function printReceipt(){
+        var receipt = $('#eg-pos-receipt-details').html();
+        if(!receipt){ return; }
+
+        var popup = window.open('', 'eggplant-pos-receipt', 'width=420,height=640');
+        if(!popup){
+          alert(<?php echo wp_json_encode( __( 'Please allow pop-ups to print the receipt.', 'eggplant' ) ); ?>);
+          return;
+        }
+
+        popup.onload = function(){
+          popup.focus();
+          popup.print();
+          popup.close();
+        };
+
+        popup.document.open();
+        popup.document.write(
+          '<!doctype html><html><head><meta charset="utf-8"><title><?php echo esc_js( __( 'Receipt', 'eggplant' ) ); ?></title>' +
+          '<style>body{font-family:Arial,sans-serif;margin:14px;color:#000;}h1{font-size:18px;margin:0 0 10px;}table{width:100%;border-collapse:collapse;}th,td{font-size:12px;padding:4px 2px;color:#000;}thead th{text-align:left;border-bottom:1px solid #000;}tbody td:first-child, tfoot th{text-align:left;}tbody td:not(:first-child),tfoot td{text-align:right;}tfoot th,tfoot td{padding-top:6px;}tfoot tr:first-child th,tfoot tr:first-child td{border-top:1px solid #000;}.eg-pos__receipt-total th,.eg-pos__receipt-total td{font-weight:700;}</style>' +
+          '</head><body><h1><?php echo esc_js( __( 'Sale Receipt', 'eggplant' ) ); ?></h1>' + receipt + '</body></html>'
+        );
+        popup.document.close();
+      }
 
       function updateTotals(){
         var subtotal=0, tax=0;
@@ -825,6 +850,11 @@ class Eggplant_POS {
         renderCart();
         $('#eg-pos-receipt').hide();
         $('#eg-pos-actions').show();
+      });
+
+      // Print receipt.
+      $('#eg-pos-btn-print-receipt').on('click', function(){
+        printReceipt();
       });
 
       // Complete sale.
