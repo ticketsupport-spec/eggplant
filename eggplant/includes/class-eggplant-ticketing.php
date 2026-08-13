@@ -163,10 +163,10 @@ class Eggplant_Ticketing {
                 <tr class="eg-ticket-receipt__total"><th><?php esc_html_e( 'Total Paid', 'eggplant' ); ?></th><td><?php echo esc_html( self::format_money( $order['net_amount'] ) ); ?></td></tr>
               </tbody>
             </table>
-            <p class="eg-ticket-receipt__actions">
+            <div class="eg-ticket-receipt__actions">
               <button type="button" class="eg-btn" onclick="window.print()"><?php esc_html_e( 'Print Receipt', 'eggplant' ); ?></button>
               <a class="eg-btn eg-btn--primary" href="<?php echo esc_url( self::build_order_url( $order['order_number'], $order['order_access_key'], true ) ); ?>"><?php esc_html_e( 'Print Tickets', 'eggplant' ); ?></a>
-            </p>
+            </div>
           </div>
         <?php endif; ?>
       <?php endif; ?>

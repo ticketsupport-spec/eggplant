@@ -848,8 +848,9 @@ class Eggplant_POS {
             html += '<thead><tr><th><?php echo esc_js( __('Item','eggplant') ); ?></th><th><?php echo esc_js( __('Qty','eggplant') ); ?></th><th><?php echo esc_js( __('Unit','eggplant') ); ?></th><th><?php echo esc_js( __('Line','eggplant') ); ?></th></tr></thead>';
             html += '<tbody>';
             $.each(cart, function(id, row){
-              var net = row.price * row.qty;
-              html += '<tr><td>'+$('<span>').text(row.name).html()+'</td><td>'+row.qty+'</td><td>'+fmt(row.price)+'</td><td>'+fmt(net)+'</td></tr>';
+              var qty = parseInt(row.qty, 10);
+              var net = row.price * qty;
+              html += '<tr><td>'+$('<span>').text(row.name).html()+'</td><td>'+qty+'</td><td>'+fmt(row.price)+'</td><td>'+fmt(net)+'</td></tr>';
             });
             html += '</tbody>';
             html += '<tfoot>';
