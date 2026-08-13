@@ -617,6 +617,17 @@ a:hover { text-decoration: underline; }
 
   .eg-print-ticket { page-break-inside: avoid; }
 
+  /* When printing the POS receipt, hide everything else on the page */
+  body.eg-pos-printing * { visibility: hidden !important; }
+  body.eg-pos-printing #eg-pos-receipt,
+  body.eg-pos-printing #eg-pos-receipt * { visibility: visible !important; }
+  body.eg-pos-printing #eg-pos-receipt {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+  }
+
   /* Ensure receipt areas print with legible colours */
   .eg-pos__receipt,
   .eg-ticket-receipt {

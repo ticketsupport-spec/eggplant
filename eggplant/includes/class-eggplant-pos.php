@@ -693,7 +693,7 @@ class Eggplant_POS {
             <h3><?php esc_html_e( 'Sale Complete', 'eggplant' ); ?></h3>
             <div id="eg-pos-receipt-details"></div>
             <div class="eg-pos__receipt-actions">
-              <button class="button" id="eg-pos-btn-print-receipt" onclick="window.print()">
+              <button class="button" id="eg-pos-btn-print-receipt" onclick="document.body.classList.add('eg-pos-printing');window.print();document.body.classList.remove('eg-pos-printing');">
                 <?php esc_html_e( 'Print Receipt', 'eggplant' ); ?>
               </button>
               <button class="button button-primary" id="eg-pos-btn-new-sale">
