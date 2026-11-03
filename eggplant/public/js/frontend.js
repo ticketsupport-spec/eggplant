@@ -86,6 +86,21 @@
       : { cls: 'private', text: 'PRIVATE EVENT', short: 'Private' };
   }
 
+  function cssUrl(url) {
+    return /^https?:\/\//i.test(url || '') ? 'url("' + url.replace(/["\\\n\r()']/g, encodeURIComponent) + '")' : '';
+  }
+
+  function eventImage(entry) {
+    return entry && entry.status === 'booked' && entry.visibility === 'public' ? cssUrl(entry.image_url) : '';
+  }
+
+  // Shared image when every floor shows the same public-event image, so it covers the whole day.
+  function dayImage(dayFloors) {
+    const keys = Object.keys(FLOORS);
+    const first = eventImage(dayFloors[keys[0]]);
+    return first && keys.every(function (f) { return eventImage(dayFloors[f]) === first; }) ? first : '';
+  }
+
   function formatDate(dateStr) {
     const d = new Date(dateStr + 'T00:00:00');
     return d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -215,6 +230,11 @@
         cell.appendChild(num);
 
         const dayFloors = data.floors[dateStr] || {};
+        const wholeDayImage = dayImage(dayFloors);
+        if (wholeDayImage) {
+          cell.classList.add('eg-day--image');
+          cell.style.backgroundImage = wholeDayImage;
+        }
         Object.keys(FLOORS).forEach(function (floor) {
           const entry = dayFloors[floor];
           const state = floorState(entry, isPast);
@@ -222,6 +242,13 @@
           const el = document.createElement(clickable ? 'button' : 'div');
           el.className = 'eg-floor eg-floor--' + state.cls;
           if (clickable) el.type = 'button';
+          const floorImage = eventImage(entry);
+          if (wholeDayImage) {
+            el.classList.add('eg-floor--on-image');
+          } else if (floorImage) {
+            el.classList.add('eg-floor--image');
+            el.style.backgroundImage = floorImage;
+          }
 
           let label = FLOORS[floor] + ': ' + (state.text || 'Past date');
           if (state.cls === 'public' && entry.title) label += ' – ' + entry.title + ' (click for details)';

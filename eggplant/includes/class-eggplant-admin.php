@@ -305,6 +305,28 @@ class Eggplant_Admin {
               <option value="booked"><?php esc_html_e( 'Booked', 'eggplant' ); ?></option>
             </select>
           </div>
+          <div class="eg-form-row">
+            <label for="eg-slot-visibility"><?php esc_html_e( 'Event Type', 'eggplant' ); ?></label>
+            <select id="eg-slot-visibility">
+              <option value="private"><?php esc_html_e( 'PRIVATE EVENT (purple blackout, details hidden)', 'eggplant' ); ?></option>
+              <option value="public"><?php esc_html_e( 'PUBLIC EVENT (label, times and image shown)', 'eggplant' ); ?></option>
+            </select>
+          </div>
+          <div class="eg-slot-public-fields" hidden>
+            <div class="eg-form-row">
+              <label for="eg-slot-image"><?php esc_html_e( 'Calendar Image', 'eggplant' ); ?></label>
+              <span class="eg-media-field">
+                <input type="url" id="eg-slot-image" placeholder="https://">
+                <button type="button" class="button eg-media-pick" data-target="#eg-slot-image"><?php esc_html_e( 'Upload / Choose Image', 'eggplant' ); ?></button>
+                <button type="button" class="button eg-media-clear" data-target="#eg-slot-image"><?php esc_html_e( 'Remove', 'eggplant' ); ?></button>
+              </span>
+            </div>
+            <div class="eg-form-row">
+              <label></label>
+              <img class="eg-media-preview" data-for="#eg-slot-image" alt="" hidden>
+            </div>
+            <p class="description"><?php esc_html_e( 'When booked, the image covers this day on the public and admin calendars. Leave empty to use the Public Event color.', 'eggplant' ); ?></p>
+          </div>
           <button type="submit" class="button button-primary" id="eg-slot-submit"><?php esc_html_e( 'Add Slot', 'eggplant' ); ?></button>
           <button type="button" class="button" id="eg-slot-cancel" hidden><?php esc_html_e( 'Cancel', 'eggplant' ); ?></button>
           <span class="eg-msg" id="eg-add-slot-msg"></span>
@@ -339,6 +361,7 @@ class Eggplant_Admin {
           <th><?php esc_html_e( 'Floor', 'eggplant' ); ?></th>
           <th><?php esc_html_e( 'Label', 'eggplant' ); ?></th>
           <th><?php esc_html_e( 'Status', 'eggplant' ); ?></th>
+          <th><?php esc_html_e( 'Event Type', 'eggplant' ); ?></th>
           <th><?php esc_html_e( 'Actions', 'eggplant' ); ?></th>
         </tr>
       </thead>
@@ -362,6 +385,16 @@ class Eggplant_Admin {
               <option value="held"      <?php selected( $slot['status'], 'held' );      ?>><?php esc_html_e( 'Hold',      'eggplant' ); ?></option>
               <option value="booked"    <?php selected( $slot['status'], 'booked' );    ?>><?php esc_html_e( 'Booked',    'eggplant' ); ?></option>
             </select>
+          </td>
+          <td>
+            <?php $visibility = 'public' === ( $slot['visibility'] ?? '' ) ? 'public' : 'private'; ?>
+            <select class="eg-slot-visibility-select" data-id="<?php echo esc_attr( $slot['id'] ); ?>" aria-label="<?php esc_attr_e( 'Event Type', 'eggplant' ); ?>">
+              <option value="private" <?php selected( $visibility, 'private' ); ?>><?php esc_html_e( 'Private Event', 'eggplant' ); ?></option>
+              <option value="public"  <?php selected( $visibility, 'public' );  ?>><?php esc_html_e( 'Public Event',  'eggplant' ); ?></option>
+            </select>
+            <?php if ( ! empty( $slot['image_url'] ) ) : ?>
+              <img class="eg-slot-thumb" src="<?php echo esc_url( $slot['image_url'] ); ?>" alt="">
+            <?php endif; ?>
           </td>
           <td>
             <button type="button" class="button eg-edit-slot" data-id="<?php echo esc_attr( $slot['id'] ); ?>"><?php esc_html_e( 'Edit', 'eggplant' ); ?></button>
@@ -907,12 +940,18 @@ class Eggplant_Admin {
     $end   = sanitize_text_field( wp_unslash( $_POST['end_time'] ?? '' ) );
     $floor = sanitize_key( wp_unslash( $_POST['floor'] ?? '' ) );
     $status = sanitize_key( wp_unslash( $_POST['status'] ?? '' ) );
+    $visibility = sanitize_key( wp_unslash( $_POST['visibility'] ?? 'private' ) );
+    $image_url  = trim( (string) wp_unslash( $_POST['image_url'] ?? '' ) );
+    if ( '' !== $image_url && ! preg_match( '#^https?://#i', $image_url ) ) {
+      wp_send_json_error( __( 'The image must be an http(s) URL.', 'eggplant' ) );
+    }
     if ( ! Eggplant_Floor_Calendar::is_valid_date( $date )
       || ! preg_match( '/^([01]\d|2[0-3]):[0-5]\d$/', $start )
       || ! preg_match( '/^([01]\d|2[0-3]):[0-5]\d$/', $end )
       || ! Eggplant_Floor_Calendar::booking_floors( $floor )
-      || ! in_array( $status, array( 'available', 'held', 'booked' ), true ) ) {
-      wp_send_json_error( __( 'Please choose a valid date, start and end time, floor, and status.', 'eggplant' ) );
+      || ! in_array( $status, array( 'available', 'held', 'booked' ), true )
+      || ! in_array( $visibility, array( 'private', 'public' ), true ) ) {
+      wp_send_json_error( __( 'Please choose a valid date, start and end time, floor, status, and event type.', 'eggplant' ) );
     }
 
     return array(
@@ -922,6 +961,8 @@ class Eggplant_Admin {
       'floor'      => $floor,
       'label'      => sanitize_text_field( wp_unslash( $_POST['label']      ?? '' ) ),
       'status'     => $status,
+      'visibility' => $visibility,
+      'image_url'  => esc_url_raw( $image_url ),
     );
   }
 
@@ -939,6 +980,8 @@ class Eggplant_Admin {
       $ok = Eggplant_DB::update_slot( $id, $this->slot_data_from_request() );
     } elseif ( isset( $_POST['floor'] ) ) {
       $ok = Eggplant_DB::update_slot_floor( $id, sanitize_key( wp_unslash( $_POST['floor'] ) ) );
+    } elseif ( isset( $_POST['visibility'] ) ) {
+      $ok = Eggplant_DB::update_slot_visibility( $id, sanitize_key( wp_unslash( $_POST['visibility'] ) ) );
     } else {
       $ok = Eggplant_DB::update_slot_status( $id, $status );
     }

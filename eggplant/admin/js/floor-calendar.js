@@ -2,6 +2,32 @@
 (function ($) {
   'use strict';
 
+  /* ── Media Library image picker (Time Slots + Floor Calendar editors) ── */
+  function syncPreview(target) {
+    const url = String($(target).val() || '');
+    const img = $('.eg-media-preview[data-for="' + target + '"]');
+    if (/^https?:\/\//i.test(url)) img.attr('src', url).prop('hidden', false);
+    else img.removeAttr('src').prop('hidden', true);
+  }
+
+  $(document).on('input change', '#eg-slot-image, #eg-fc-image', function () { syncPreview('#' + this.id); });
+  $(document).on('click', '.eg-media-clear', function () { $($(this).data('target')).val('').trigger('change'); });
+  $(document).on('click', '.eg-media-pick', function (e) {
+    e.preventDefault();
+    const target = $(this).data('target');
+    if (!window.wp || !wp.media) {
+      $(target).trigger('focus');
+      return;
+    }
+    const frame = wp.media({ title: 'Choose Event Image', button: { text: 'Use this image' }, library: { type: 'image' }, multiple: false });
+    frame.on('select', function () {
+      const file = frame.state().get('selection').first().toJSON();
+      const size = file.sizes && (file.sizes.large || file.sizes.full);
+      $(target).val(size ? size.url : file.url).trigger('change');
+    });
+    frame.open();
+  });
+
   if (typeof EggplantFloorCal === 'undefined') return;
 
   const cfg    = EggplantFloorCal;
@@ -27,6 +53,21 @@
     return entry.visibility === 'public'
       ? { cls: 'public',  text: 'PUBLIC EVENT' }
       : { cls: 'private', text: 'PRIVATE EVENT' };
+  }
+
+  function cssUrl(url) {
+    return /^https?:\/\//i.test(url || '') ? 'url("' + url.replace(/["\\\n\r()']/g, encodeURIComponent) + '")' : '';
+  }
+
+  function eventImage(entry) {
+    return entry && entry.status === 'booked' && entry.visibility === 'public' ? cssUrl(entry.image_url) : '';
+  }
+
+  // Shared image when every floor shows the same public-event image, so it covers the whole day.
+  function dayImage(dayData) {
+    const keys = Object.keys(floors);
+    const first = eventImage((dayData || {})[keys[0]]);
+    return first && keys.every(function (f) { return eventImage(dayData[f]) === first; }) ? first : '';
   }
 
   function load() {
@@ -67,6 +108,12 @@
       if (date === cfg.today) cell.classList.add('eg-fc-day--today');
       if (date < cfg.today) cell.classList.add('eg-fc-day--past');
 
+      const wholeDayImage = dayImage(data[date]);
+      if (wholeDayImage) {
+        cell.classList.add('eg-fc-day--image');
+        cell.style.backgroundImage = wholeDayImage;
+      }
+
       const num = document.createElement('div');
       num.className = 'eg-fc-day__num';
       num.textContent = d;
@@ -78,6 +125,13 @@
         const btn   = document.createElement(cfg.readOnly ? 'div' : 'button');
         if (!cfg.readOnly) btn.type = 'button';
         btn.className = 'eg-fc-floor eg-fc--' + info.cls;
+        const floorImage = eventImage(entry);
+        if (wholeDayImage) {
+          btn.classList.add('eg-fc-floor--on-image');
+        } else if (floorImage) {
+          btn.classList.add('eg-fc-floor--image');
+          btn.style.backgroundImage = floorImage;
+        }
         btn.title = floors[floor] + ': ' + info.text + (entry && entry.title ? ' – ' + entry.title : '') + (entry && entry.note ? ' (' + entry.note + ')' : '');
 
         const name = document.createElement('span');
@@ -129,7 +183,7 @@
     $('#eg-fc-start').val(entry ? entry.start : '');
     $('#eg-fc-end').val(entry ? entry.end : '');
     $('#eg-fc-description').val(entry ? entry.description : '');
-    $('#eg-fc-image').val(entry ? entry.image_url : '');
+    $('#eg-fc-image').val(entry ? entry.image_url : '').trigger('change');
     $('#eg-fc-link').val(entry ? entry.link_url : '');
     $('#eg-fc-note').val(entry ? entry.note : '');
     $('#eg-fc-editor-msg').removeClass('eg-msg--success eg-msg--error').text(

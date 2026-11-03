@@ -13,9 +13,18 @@
      TIME SLOTS PAGE
   ================================================================ */
 
+  function toggleSlotPublicFields() {
+    $('.eg-slot-public-fields').prop('hidden', $('#eg-slot-visibility').val() !== 'public');
+  }
+
+  $('#eg-slot-visibility').on('change', toggleSlotPublicFields);
+
   function resetSlotForm() {
     $('#eg-add-slot-form')[0].reset();
     $('#eg-slot-id').val('');
+    $('#eg-slot-visibility').val('private');
+    $('#eg-slot-image').val('').trigger('change');
+    toggleSlotPublicFields();
     $('#eg-slot-form-title').text('Add Time Slot');
     $('#eg-slot-submit').text('Add Slot');
     $('#eg-slot-cancel').prop('hidden', true);
@@ -43,6 +52,9 @@
         $('#eg-slot-floor').val(slot.floor);
         $('#eg-slot-label').val(slot.label);
         $('#eg-slot-status').val(slot.status);
+        $('#eg-slot-visibility').val(slot.visibility === 'public' ? 'public' : 'private');
+        $('#eg-slot-image').val(slot.image_url || '').trigger('change');
+        toggleSlotPublicFields();
         $('#eg-slot-form-title').text('Edit Time Slot');
         $('#eg-slot-submit').text('Save Changes');
         $('#eg-slot-cancel').prop('hidden', false);
@@ -70,7 +82,9 @@
       end_time:   $('#eg-slot-end').val(),
       floor:      $('#eg-slot-floor').val(),
       label:      $('#eg-slot-label').val(),
-      status:     $('#eg-slot-status').val()
+      status:     $('#eg-slot-status').val(),
+      visibility: $('#eg-slot-visibility').val(),
+      image_url:  $('#eg-slot-image').val()
     }).done(function (res) {
       if (res.success) {
         msg.addClass('eg-msg--success').text(id ? 'Slot updated!' : 'Slot added!');
@@ -87,10 +101,11 @@
     });
   });
 
-  // Update slot status or floor inline.
-  $(document).on('change', '.eg-slot-status-select, .eg-slot-floor-select', function () {
+  // Update slot status, floor or event type inline.
+  $(document).on('change', '.eg-slot-status-select, .eg-slot-floor-select, .eg-slot-visibility-select', function () {
     const select = $(this);
-    const field = select.hasClass('eg-slot-floor-select') ? 'floor' : 'status';
+    const field = select.hasClass('eg-slot-floor-select') ? 'floor'
+      : (select.hasClass('eg-slot-visibility-select') ? 'visibility' : 'status');
     const payload = { action: 'eggplant_admin_update_slot', nonce: nonce, id: select.data('id') };
     payload[field] = select.val();
     select.prop('disabled', true);
@@ -99,7 +114,10 @@
         if (!res.success) {
           alert(res.data || 'Could not update slot.');
         } else {
-          if ($('#eg-slot-id').val() === String(payload.id)) $('#eg-slot-' + field).val(payload[field]);
+          if ($('#eg-slot-id').val() === String(payload.id)) {
+            $('#eg-slot-' + field).val(payload[field]);
+            toggleSlotPublicFields();
+          }
           $(document).trigger('eggplant:slots-changed');
         }
       }).fail(function () {
@@ -141,7 +159,7 @@
         return;
       }
       let html = '<table class="widefat striped eg-slots-table"><thead><tr>' +
-        '<th>Date</th><th>Start</th><th>End</th><th>Floor</th><th>Label</th><th>Status</th><th>Actions</th>' +
+        '<th>Date</th><th>Start</th><th>End</th><th>Floor</th><th>Label</th><th>Status</th><th>Event Type</th><th>Actions</th>' +
         '</tr></thead><tbody>';
       res.data.forEach(function (s) {
         html += '<tr id="eg-slot-row-' + s.id + '">' +
@@ -159,6 +177,12 @@
             opt('held',      s.status, 'Hold') +
             opt('booked',    s.status, 'Booked') +
           '</select></td>' +
+          '<td><select class="eg-slot-visibility-select" data-id="' + s.id + '" aria-label="Event Type">' +
+            opt('private', s.visibility === 'public' ? 'public' : 'private', 'Private Event') +
+            opt('public',  s.visibility === 'public' ? 'public' : 'private', 'Public Event') +
+          '</select>' +
+          (/^https?:\/\//i.test(s.image_url || '') ? ' <img class="eg-slot-thumb" src="' + esc(s.image_url) + '" alt="">' : '') +
+          '</td>' +
           '<td><button type="button" class="button eg-edit-slot" data-id="' + s.id + '">Edit</button> ' +
           '<button class="button eg-delete-slot" data-id="' + s.id + '">Delete</button></td>' +
           '</tr>';
@@ -295,6 +319,12 @@
   /* ── Helpers ── */
   function esc(str) {
     return $('<div>').text(str || '').html();
+  }
+
+  function escAttr(str) {
+    return String(str || '').replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
   }
 
   function opt(value, current, label) {
