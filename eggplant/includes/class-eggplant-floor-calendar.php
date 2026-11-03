@@ -183,6 +183,17 @@ class Eggplant_Floor_Calendar {
         }
         if ( 'booked' === $slot['status'] ) {
           $days[ $key ]['status'] = 'booked';
+          if ( 'public' === ( $slot['visibility'] ?? 'private' ) ) {
+            if ( 'public' !== $days[ $key ]['visibility'] ) {
+              $days[ $key ]['visibility'] = 'public';
+              $days[ $key ]['title']      = $slot['label'] ? $slot['label'] : __( 'Public Event', 'eggplant' );
+              $days[ $key ]['start_time'] = $slot['start_time'];
+              $days[ $key ]['end_time']   = $slot['end_time'];
+            }
+            if ( '' === $days[ $key ]['image_url'] && ! empty( $slot['image_url'] ) ) {
+              $days[ $key ]['image_url'] = $slot['image_url'];
+            }
+          }
         }
         $days[ $key ]['note'] .= ( $days[ $key ]['note'] ? '; ' : '' )
           . substr( $slot['start_time'], 0, 5 ) . ' - ' . substr( $slot['end_time'], 0, 5 )
@@ -368,6 +379,7 @@ class Eggplant_Floor_Calendar {
     if ( ! in_array( $hook, array( 'event-portal_page_eggplant-floor-calendar', 'event-portal_page_eggplant-slots' ), true ) ) {
       return;
     }
+    wp_enqueue_media();
     wp_enqueue_style( 'eggplant-admin', EGGPLANT_PLUGIN_URL . 'admin/css/admin.css', array(), EGGPLANT_VERSION );
     wp_add_inline_style( 'eggplant-admin', self::color_vars_css() );
     wp_enqueue_script(
@@ -403,7 +415,7 @@ class Eggplant_Floor_Calendar {
       <h1><?php esc_html_e( 'Floor Calendar', 'eggplant' ); ?></h1>
       <p class="description">
         <?php if ( $read_only ) : ?>
-          <?php esc_html_e( 'Booked time slots show as private events; holds show as unavailable. Times remain in the list above. Availability is per floor for the whole day.', 'eggplant' ); ?>
+          <?php esc_html_e( 'Booked time slots show as private events unless marked PUBLIC EVENT (with their image, if uploaded); holds show as unavailable. Times remain in the list above. Availability is per floor for the whole day.', 'eggplant' ); ?>
         <?php else : ?>
           <?php esc_html_e( 'Each floor can hold one booking per day. Click a floor on any day to book it (private or public event), mark it unavailable, or make it available again. Manage time-slot bookings on the Time Slots page.', 'eggplant' ); ?>
         <?php endif; ?>
@@ -482,7 +494,15 @@ class Eggplant_Floor_Calendar {
               </div>
               <div class="eg-form-row">
                 <label for="eg-fc-image"><?php esc_html_e( 'Image URL', 'eggplant' ); ?></label>
-                <input type="url" id="eg-fc-image" placeholder="https://">
+                <span class="eg-media-field">
+                  <input type="url" id="eg-fc-image" placeholder="https://">
+                  <button type="button" class="button eg-media-pick" data-target="#eg-fc-image"><?php esc_html_e( 'Upload / Choose Image', 'eggplant' ); ?></button>
+                  <button type="button" class="button eg-media-clear" data-target="#eg-fc-image"><?php esc_html_e( 'Remove', 'eggplant' ); ?></button>
+                </span>
+              </div>
+              <div class="eg-form-row">
+                <label></label>
+                <img class="eg-media-preview" data-for="#eg-fc-image" alt="" hidden>
               </div>
               <div class="eg-form-row">
                 <label for="eg-fc-link"><?php esc_html_e( 'Tickets / Info URL', 'eggplant' ); ?></label>

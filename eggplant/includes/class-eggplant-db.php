@@ -14,7 +14,7 @@ class Eggplant_DB {
   /**
    * Insert a time slot.
    *
-   * @param array<string,mixed> $data  Keys: slot_date, start_time, end_time, floor, label, status
+   * @param array<string,mixed> $data  Keys: slot_date, start_time, end_time, floor, label, status, visibility, image_url
    * @return int|false  Inserted row ID or false on failure.
    */
   public static function insert_slot( array $data ) {
@@ -32,8 +32,10 @@ class Eggplant_DB {
         'label'      => sanitize_text_field( $data['label']      ?? '' ),
         'status'     => in_array( $data['status'] ?? 'available', array( 'available', 'booked', 'held' ), true )
                         ? $data['status'] : 'available',
+        'visibility' => 'public' === ( $data['visibility'] ?? '' ) ? 'public' : 'private',
+        'image_url'  => esc_url_raw( $data['image_url'] ?? '' ),
       ),
-      array( '%s', '%s', '%s', '%s', '%s', '%s' )
+      array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
     );
     return $result ? $wpdb->insert_id : false;
   }
@@ -67,6 +69,20 @@ class Eggplant_DB {
     return false !== $wpdb->update(
       $wpdb->prefix . 'eggplant_time_slots',
       array( 'floor' => $floor ),
+      array( 'id' => $id ),
+      array( '%s' ),
+      array( '%d' )
+    );
+  }
+
+  public static function update_slot_visibility( int $id, string $visibility ): bool {
+    global $wpdb;
+    if ( ! in_array( $visibility, array( 'private', 'public' ), true ) ) {
+      return false;
+    }
+    return false !== $wpdb->update(
+      $wpdb->prefix . 'eggplant_time_slots',
+      array( 'visibility' => $visibility ),
       array( 'id' => $id ),
       array( '%s' ),
       array( '%d' )

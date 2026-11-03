@@ -11,6 +11,7 @@ function sanitize_key( $text ) { return preg_replace( '/[^a-z0-9_-]/', '', strto
 function wp_unslash( $value ) { return $value; }
 function wp_kses_post( $value ) { return $value; }
 function esc_url_raw( $value ) { return $value; }
+function esc_url( $value ) { return htmlspecialchars( (string) $value, ENT_QUOTES, 'UTF-8' ); }
 function esc_html( $value ) { return htmlspecialchars( (string) $value, ENT_QUOTES, 'UTF-8' ); }
 function esc_attr( $value ) { return esc_html( $value ); }
 function esc_html__( $text, $domain = '' ) { return esc_html( $text ); }
@@ -134,7 +135,10 @@ $migration = new ReflectionMethod( Eggplant_Activator::class, 'ensure_column' );
 if ( PHP_VERSION_ID < 80100 ) $migration->setAccessible( true );
 $migration->invoke( null, 'eggplant_time_slots', 'floor', "VARCHAR(20) NOT NULL DEFAULT 'both'" );
 $migration->invoke( null, 'eggplant_time_slots', 'floor', "VARCHAR(20) NOT NULL DEFAULT 'both'" );
+$migration->invoke( null, 'eggplant_time_slots', 'visibility', "VARCHAR(10) NOT NULL DEFAULT 'private'" );
+$migration->invoke( null, 'eggplant_time_slots', 'image_url', 'TEXT' );
 expect( 'both' === Eggplant_DB::get_slot( 1 )['floor'], 'Upgrade must preserve existing slots and default to both floors.' );
+expect( 'private' === Eggplant_DB::get_slot( 1 )['visibility'], 'Upgraded slots must default to private events.' );
 $wpdb->query( "CREATE TABLE wp_eggplant_floor_days (
   id INTEGER PRIMARY KEY AUTOINCREMENT, day_date TEXT, floor TEXT, status TEXT, visibility TEXT,
   title TEXT, description TEXT, start_time TEXT, end_time TEXT, image_url TEXT, link_url TEXT,
@@ -210,6 +214,44 @@ foreach ( array(
 ) as $invalid ) {
   expect( ! request( $admin, 'ajax_add_slot', array_merge( $slot, $invalid ) )->success, 'Invalid fields must fail explicitly.' );
 }
+expect( ! request( $admin, 'ajax_add_slot', array_merge( $slot, array( 'visibility' => 'secret' ) ) )->success, 'Invalid event types must fail.' );
+expect( ! request( $admin, 'ajax_add_slot', array_merge( $slot, array( 'image_url' => 'javascript:alert(1)' ) ) )->success, 'Non-http images must fail.' );
 expect( ! request( $admin, 'ajax_update_slot', array_merge( $edited, array( 'id' => 999 ) ) )->success, 'Editing a missing slot must fail.' );
+
+// Public events with an image.
+$public_slot = array_merge( $slot, array(
+  'slot_date' => '2026-11-20', 'floor' => 'both', 'label' => 'Jazz Night', 'status' => 'booked',
+  'visibility' => 'public', 'image_url' => 'https://example.com/jazz.jpg',
+) );
+$created = request( $admin, 'ajax_add_slot', $public_slot );
+expect( $created->success, 'Adding a public slot should succeed.' );
+$public_id = $created->data['id'];
+$stored = Eggplant_DB::get_slot( $public_id );
+expect( 'public' === $stored['visibility'] && 'https://example.com/jazz.jpg' === $stored['image_url'], 'Event type and image must persist.' );
+$public = Eggplant_Floor_Calendar::get_public_month( '2026-11' );
+foreach ( array( 'floor_1', 'floor_2' ) as $floor ) {
+  $day = $public['2026-11-20'][ $floor ];
+  expect( 'public' === $day['visibility'] && 'Jazz Night' === $day['title'] && 'https://example.com/jazz.jpg' === $day['image_url']
+    && '18:30' === $day['start'] && ! isset( $day['note'] ), 'Public slots must expose their title, time and image (never internal notes).' );
+}
+$month = request( $calendar, 'ajax_get_month', array( 'month' => '2026-11' ) );
+expect( 'https://example.com/jazz.jpg' === $month->data['2026-11-20']['floor_1']['image_url'], 'Admin calendar must receive the event image.' );
+expect( request( $admin, 'ajax_update_slot', array( 'id' => $public_id, 'visibility' => 'private' ) )->success, 'Inline event type editing should succeed.' );
+$public = Eggplant_Floor_Calendar::get_public_month( '2026-11' );
+expect( array( 'status' => 'booked', 'visibility' => 'private' ) === $public['2026-11-20']['floor_1'], 'Private slots must hide the image and details.' );
+expect( ! request( $admin, 'ajax_update_slot', array( 'id' => $public_id, 'visibility' => 'secret' ) )->success, 'Invalid inline event types must fail.' );
+$edited_public = array_merge( $public_slot, array( 'id' => $public_id, 'image_url' => '' ) );
+expect( request( $admin, 'ajax_update_slot', $edited_public )->success, 'Full edit of a public slot should succeed.' );
+$public = Eggplant_Floor_Calendar::get_public_month( '2026-11' );
+expect( 'public' === $public['2026-11-20']['floor_2']['visibility'] && '' === $public['2026-11-20']['floor_2']['image_url'], 'Removing the image must keep the public event without an image.' );
+Eggplant_DB::update_slot( $public_id, array( 'image_url' => 'https://example.com/jazz.jpg' ) );
+Eggplant_DB::update_slot_status( $public_id, 'held' );
+$public = Eggplant_Floor_Calendar::get_public_month( '2026-11' );
+expect( array( 'status' => 'blocked' ) === $public['2026-11-20']['floor_1'], 'Held public slots must not reveal details.' );
+ob_start();
+$admin->page_slots();
+$html = ob_get_clean();
+expect( false !== strpos( $html, 'id="eg-slot-visibility"' ) && false !== strpos( $html, 'eg-media-pick' )
+  && false !== strpos( $html, 'eg-slot-visibility-select' ) && false !== strpos( $html, 'class="eg-slot-thumb" src="https://example.com/jazz.jpg"' ), 'Slots page must render event type and image upload controls.' );
 expect( ! request( $admin, 'ajax_get_slots', array(), array( 'id' => 999 ) )->success, 'Loading a missing slot must fail.' );
 echo "Time-slot regressions passed.\n";
