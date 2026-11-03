@@ -457,11 +457,11 @@ class Eggplant_Admin {
 
   public function page_bookings(): void {
     $bookings    = Eggplant_DB::get_all_bookings();
-    $floor_names = Eggplant_Floor_Calendar::floor_names();
+    $floor_names = Eggplant_Floor_Calendar::booking_floor_names();
     ?>
     <div class="wrap eg-admin">
       <h1><?php esc_html_e( 'Booking Requests', 'eggplant' ); ?></h1>
-      <p class="description"><?php esc_html_e( 'Approving a request automatically books the requested floor on the Floor Calendar as a PRIVATE EVENT (if the floor is still free). Declining it frees the floor again.', 'eggplant' ); ?></p>
+      <p class="description"><?php esc_html_e( 'Approving a request automatically books the requested floor(s) on the Floor Calendar as a PRIVATE EVENT (if all requested floors are still free). Declining it frees those floors again.', 'eggplant' ); ?></p>
       <?php if ( empty( $bookings ) ) : ?>
         <p><?php esc_html_e( 'No booking requests yet.', 'eggplant' ); ?></p>
       <?php else : ?>
@@ -986,32 +986,55 @@ class Eggplant_Admin {
     if ( ! $booking || empty( $booking['floor'] ) || empty( $booking['event_date'] ) ) {
       return '';
     }
-    $date  = $booking['event_date'];
-    $floor = $booking['floor'];
+    $date   = $booking['event_date'];
+    $floors = Eggplant_Floor_Calendar::booking_floors( $booking['floor'] );
 
     if ( 'approved' !== $status ) {
       Eggplant_Floor_Calendar::delete_for_booking( $booking_id );
       return '';
     }
 
-    $existing = Eggplant_Floor_Calendar::get_day( $date, $floor );
-    if ( $existing && (int) $existing['booking_id'] !== $booking_id ) {
-      return __( 'Note: that floor is already booked or blocked on this date, so the Floor Calendar was not changed.', 'eggplant' );
-    }
-    if ( $existing ) {
-      return '';
+    $free_floors = array();
+    foreach ( $floors as $floor ) {
+      $existing = Eggplant_Floor_Calendar::get_day( $date, $floor );
+      if ( $existing && (int) ( $existing['booking_id'] ?? 0 ) !== $booking_id ) {
+        return __( 'Note: a requested floor is already booked or blocked on this date, so the Floor Calendar was not changed.', 'eggplant' );
+      }
+      if ( ! $existing ) {
+        $free_floors[] = $floor;
+      }
     }
 
-    $claimed = Eggplant_Floor_Calendar::save_day( $date, $floor, array(
-      'status'     => 'booked',
-      'visibility' => 'private',
-      'title'      => $booking['event_type'] ? $booking['event_type'] : $booking['name'],
-      'note'       => $booking['name'] . ' – ' . $booking['email'],
-      'booking_id' => $booking_id,
-    ), true );
-    if ( ! $claimed ) {
-      return __( 'Note: that floor is already booked or blocked on this date, so the Floor Calendar was not changed.', 'eggplant' );
+    $claimed_ids = array();
+    foreach ( $free_floors as $floor ) {
+      $claimed = Eggplant_Floor_Calendar::save_day( $date, $floor, array(
+        'status'     => 'booked',
+        'visibility' => 'private',
+        'title'      => $booking['event_type'] ? $booking['event_type'] : $booking['name'],
+        'note'       => $booking['name'] . ' – ' . $booking['email'],
+        'booking_id' => $booking_id,
+      ), true );
+      if ( ! $claimed ) {
+        // Roll back only entries created by this attempt, not existing bookings.
+        global $wpdb;
+        $rollback_failed = false;
+        foreach ( $claimed_ids as $claimed_id ) {
+          $deleted = $wpdb->delete(
+            $wpdb->prefix . 'eggplant_floor_days',
+            array( 'id' => $claimed_id, 'booking_id' => $booking_id ),
+            array( '%d', '%d' )
+          );
+          if ( false === $deleted ) {
+            $rollback_failed = true;
+          }
+        }
+        if ( $rollback_failed ) {
+          return __( 'Note: only part of this booking was saved and could not be undone. Please correct the Floor Calendar manually.', 'eggplant' );
+        }
+        return __( 'Note: the requested floors could not be booked. Please check their availability on the Floor Calendar.', 'eggplant' );
+      }
+      $claimed_ids[] = $claimed;
     }
-    return __( 'Floor booked on the Floor Calendar.', 'eggplant' );
+    return $claimed_ids ? __( 'Requested floors booked on the Floor Calendar.', 'eggplant' ) : '';
   }
 }

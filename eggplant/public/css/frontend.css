@@ -618,6 +618,17 @@ body.eg-modal-open { overflow: hidden; }
   border-color: var(--eg-primary, #e63946);
 }
 
+#eg-event-date {
+  color-scheme: dark;
+  cursor: pointer;
+}
+
+#eg-event-date::-webkit-calendar-picker-indicator {
+  filter: brightness(0) invert(1);
+  cursor: pointer;
+  opacity: 1;
+}
+
 #eg-booking-response {
   margin-top: 1rem;
   font-size: .95rem;

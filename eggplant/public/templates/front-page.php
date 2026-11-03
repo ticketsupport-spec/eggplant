@@ -213,16 +213,9 @@ if ( current_user_can( 'manage_options' ) && ( $staff_tasks_url || $staff_clock_
           <label for="eg-floor"><?php esc_html_e( 'Floor *', 'eggplant' ); ?></label>
           <select id="eg-floor" name="floor" required>
             <option value=""><?php esc_html_e( '— Select a floor —', 'eggplant' ); ?></option>
-            <?php foreach ( $floors as $floor_key => $floor_name ) : ?>
+            <?php foreach ( Eggplant_Floor_Calendar::booking_floor_names() as $floor_key => $floor_name ) : ?>
               <option value="<?php echo esc_attr( $floor_key ); ?>"><?php echo esc_html( $floor_name ); ?></option>
             <?php endforeach; ?>
-          </select>
-        </div>
-
-        <div class="eg-form-row" id="eg-time-slot-row">
-          <label for="eg-time-slot"><?php esc_html_e( 'Preferred Time Slot', 'eggplant' ); ?></label>
-          <select id="eg-time-slot" name="time_slot_id">
-            <option value=""><?php esc_html_e( '— Choose a date first —', 'eggplant' ); ?></option>
           </select>
         </div>
 

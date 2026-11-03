@@ -95,6 +95,7 @@ class Eggplant_Frontend {
       'carouselAuto'    => ! empty( $settings['carousel_autoplay'] ),
       'showBookingForm' => ! empty( $settings['show_booking_form'] ),
       'floors'          => Eggplant_Floor_Calendar::floor_names(),
+      'bookingFloors'   => Eggplant_Floor_Calendar::booking_floor_names(),
       'today'           => current_time( 'Y-m-d' ),
     ) );
   }
@@ -215,7 +216,6 @@ class Eggplant_Frontend {
     $phone      = sanitize_text_field( wp_unslash( $_POST['phone']      ?? '' ) );
     $event_type = sanitize_text_field( wp_unslash( $_POST['event_type'] ?? '' ) );
     $event_date = sanitize_text_field( wp_unslash( $_POST['event_date'] ?? '' ) );
-    $slot_id    = intval( $_POST['time_slot_id'] ?? 0 );
     $floor      = sanitize_key( wp_unslash( $_POST['floor'] ?? '' ) );
     $message    = sanitize_textarea_field( wp_unslash( $_POST['message'] ?? '' ) );
 
@@ -231,17 +231,19 @@ class Eggplant_Frontend {
       wp_send_json_error( __( 'Please choose a date in the future.', 'eggplant' ) );
     }
 
-    $floor_names = Eggplant_Floor_Calendar::floor_names();
+    $floor_names = Eggplant_Floor_Calendar::booking_floor_names();
     if ( ! isset( $floor_names[ $floor ] ) ) {
       wp_send_json_error( __( 'Please choose a floor.', 'eggplant' ) );
     }
 
-    if ( ! Eggplant_Floor_Calendar::is_available( $event_date, $floor ) ) {
-      wp_send_json_error( sprintf(
-        /* translators: %s: floor name */
-        __( 'Sorry, the %s is not available on that date. Please choose another date or floor.', 'eggplant' ),
-        $floor_names[ $floor ]
-      ) );
+    foreach ( Eggplant_Floor_Calendar::booking_floors( $floor ) as $requested_floor ) {
+      if ( ! Eggplant_Floor_Calendar::is_available( $event_date, $requested_floor ) ) {
+        wp_send_json_error( sprintf(
+          /* translators: %s: floor name */
+          __( 'Sorry, the %s is not available on that date. Please choose another date or floor.', 'eggplant' ),
+          $floor_names[ $requested_floor ]
+        ) );
+      }
     }
 
     $id = Eggplant_DB::insert_booking( array(
@@ -250,7 +252,6 @@ class Eggplant_Frontend {
       'phone'        => $phone,
       'event_type'   => $event_type,
       'event_date'   => $event_date,
-      'time_slot_id' => $slot_id ?: null,
       'floor'        => $floor,
       'message'      => $message,
     ) );
