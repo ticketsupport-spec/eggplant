@@ -94,6 +94,8 @@ class Eggplant_Frontend {
       'carouselSpeed'   => intval( $settings['carousel_speed'] ),
       'carouselAuto'    => ! empty( $settings['carousel_autoplay'] ),
       'showBookingForm' => ! empty( $settings['show_booking_form'] ),
+      'floors'          => Eggplant_Floor_Calendar::floor_names(),
+      'today'           => current_time( 'Y-m-d' ),
     ) );
   }
 
@@ -131,6 +133,9 @@ class Eggplant_Frontend {
     $avail     = esc_attr( $settings['available_color'] ?? '#2a9d8f' );
     $booked    = esc_attr( $settings['booked_color']    ?? '#e63946' );
     $held      = esc_attr( $settings['held_color']      ?? '#f4a261' );
+    $private   = esc_attr( $settings['private_color']   ?? '#7b2cbf' );
+    $public    = esc_attr( $settings['public_color']    ?? '#1d7ed8' );
+    $blocked   = esc_attr( $settings['blocked_color']   ?? '#4a4a4a' );
     $custom    = wp_strip_all_tags( $settings['custom_css'] ?? '' );
 
     $css  = ":root{";
@@ -141,6 +146,9 @@ class Eggplant_Frontend {
     $css .= "--eg-available:{$avail};";
     $css .= "--eg-booked:{$booked};";
     $css .= "--eg-held:{$held};";
+    $css .= "--eg-private:{$private};";
+    $css .= "--eg-public:{$public};";
+    $css .= "--eg-blocked:{$blocked};";
     $css .= "}";
     $css .= $custom;
     return $css;
@@ -149,14 +157,16 @@ class Eggplant_Frontend {
   // ------------------------------------------------------------------ AJAX
 
   /**
-   * Return time-slot data for a given month (YYYY-MM) as JSON.
+   * Return calendar data for a given month (YYYY-MM) as JSON:
+   *  - slots : legacy time-slot data keyed by date.
+   *  - floors: floor-calendar data keyed by date then floor (public-safe).
    */
   public function ajax_get_calendar(): void {
     check_ajax_referer( 'eggplant_nonce', 'nonce' );
 
     $month = isset( $_GET['month'] ) ? sanitize_text_field( wp_unslash( $_GET['month'] ) ) : current_time( 'Y-m' );
 
-    if ( ! preg_match( '/^\d{4}-\d{2}$/', $month ) ) {
+    if ( ! preg_match( '/^\d{4}-(0[1-9]|1[0-2])$/', $month ) ) {
       wp_send_json_error( 'Invalid month format' );
     }
 
@@ -188,7 +198,10 @@ class Eggplant_Frontend {
       }
     }
 
-    wp_send_json_success( $by_day );
+    wp_send_json_success( array(
+      'slots'  => (object) $by_day,
+      'floors' => (object) Eggplant_Floor_Calendar::get_public_month( $month ),
+    ) );
   }
 
   /**
@@ -203,14 +216,32 @@ class Eggplant_Frontend {
     $event_type = sanitize_text_field( wp_unslash( $_POST['event_type'] ?? '' ) );
     $event_date = sanitize_text_field( wp_unslash( $_POST['event_date'] ?? '' ) );
     $slot_id    = intval( $_POST['time_slot_id'] ?? 0 );
+    $floor      = sanitize_key( wp_unslash( $_POST['floor'] ?? '' ) );
     $message    = sanitize_textarea_field( wp_unslash( $_POST['message'] ?? '' ) );
 
     if ( empty( $name ) || ! is_email( $email ) ) {
       wp_send_json_error( __( 'Please provide your name and a valid email address.', 'eggplant' ) );
     }
 
-    if ( empty( $event_date ) ) {
+    if ( empty( $event_date ) || ! Eggplant_Floor_Calendar::is_valid_date( $event_date ) ) {
       wp_send_json_error( __( 'Please choose an event date.', 'eggplant' ) );
+    }
+
+    if ( $event_date < current_time( 'Y-m-d' ) ) {
+      wp_send_json_error( __( 'Please choose a date in the future.', 'eggplant' ) );
+    }
+
+    $floor_names = Eggplant_Floor_Calendar::floor_names();
+    if ( ! isset( $floor_names[ $floor ] ) ) {
+      wp_send_json_error( __( 'Please choose a floor.', 'eggplant' ) );
+    }
+
+    if ( ! Eggplant_Floor_Calendar::is_available( $event_date, $floor ) ) {
+      wp_send_json_error( sprintf(
+        /* translators: %s: floor name */
+        __( 'Sorry, the %s is not available on that date. Please choose another date or floor.', 'eggplant' ),
+        $floor_names[ $floor ]
+      ) );
     }
 
     $id = Eggplant_DB::insert_booking( array(
@@ -220,6 +251,7 @@ class Eggplant_Frontend {
       'event_type'   => $event_type,
       'event_date'   => $event_date,
       'time_slot_id' => $slot_id ?: null,
+      'floor'        => $floor,
       'message'      => $message,
     ) );
 
@@ -233,10 +265,10 @@ class Eggplant_Frontend {
     $body        = sprintf(
       /* translators: booking request notification email */
       __(
-        "New booking request received:\n\nName: %s\nEmail: %s\nPhone: %s\nEvent Type: %s\nDate: %s\nMessage:\n%s",
+        "New booking request received:\n\nName: %s\nEmail: %s\nPhone: %s\nEvent Type: %s\nDate: %s\nFloor: %s\nMessage:\n%s",
         'eggplant'
       ),
-      $name, $email, $phone, $event_type, $event_date, $message
+      $name, $email, $phone, $event_type, $event_date, $floor_names[ $floor ], $message
     );
     wp_mail( $admin_email, $subject, $body );
 

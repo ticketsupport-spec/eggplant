@@ -14,6 +14,7 @@ if ( ! defined( 'WPINC' ) ) {
 $settings = Eggplant_Settings::get_all();
 $events   = Eggplant_DB::get_active_events();
 $title    = $settings['portal_title'] ?? 'Event Center';
+$floors   = Eggplant_Floor_Calendar::floor_names();
 ?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
@@ -132,9 +133,20 @@ if ( current_user_can( 'manage_options' ) && ( $staff_tasks_url || $staff_clock_
       <!-- Legend -->
       <ul class="eg-legend">
         <li><span class="eg-legend__dot eg-legend__dot--available"></span><?php esc_html_e( 'Available', 'eggplant' ); ?></li>
-        <li><span class="eg-legend__dot eg-legend__dot--booked"></span><?php esc_html_e( 'Booked',    'eggplant' ); ?></li>
-        <li><span class="eg-legend__dot eg-legend__dot--held"></span><?php esc_html_e( 'On Hold',   'eggplant' ); ?></li>
+        <li><span class="eg-legend__dot eg-legend__dot--private"></span><?php esc_html_e( 'Private Event', 'eggplant' ); ?></li>
+        <li><span class="eg-legend__dot eg-legend__dot--public"></span><?php esc_html_e( 'Public Event (click for details)', 'eggplant' ); ?></li>
+        <li><span class="eg-legend__dot eg-legend__dot--blocked"></span><?php esc_html_e( 'Unavailable', 'eggplant' ); ?></li>
       </ul>
+      <p class="eg-calendar__hint">
+        <?php
+        echo esc_html( sprintf(
+          /* translators: 1: floor 1 name, 2: floor 2 name */
+          __( 'Each day shows %1$s (top) and %2$s (bottom). One event per floor per day.', 'eggplant' ),
+          $floors['floor_1'],
+          $floors['floor_2']
+        ) );
+        ?>
+      </p>
 
       <!-- Calendar nav -->
       <div class="eg-calendar__nav">
@@ -197,6 +209,16 @@ if ( current_user_can( 'manage_options' ) && ( $staff_tasks_url || $staff_clock_
           <input type="date" id="eg-event-date" name="event_date" required>
         </div>
 
+        <div class="eg-form-row">
+          <label for="eg-floor"><?php esc_html_e( 'Floor *', 'eggplant' ); ?></label>
+          <select id="eg-floor" name="floor" required>
+            <option value=""><?php esc_html_e( '— Select a floor —', 'eggplant' ); ?></option>
+            <?php foreach ( $floors as $floor_key => $floor_name ) : ?>
+              <option value="<?php echo esc_attr( $floor_key ); ?>"><?php echo esc_html( $floor_name ); ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
         <div class="eg-form-row" id="eg-time-slot-row">
           <label for="eg-time-slot"><?php esc_html_e( 'Preferred Time Slot', 'eggplant' ); ?></label>
           <select id="eg-time-slot" name="time_slot_id">
@@ -220,6 +242,20 @@ if ( current_user_can( 'manage_options' ) && ( $staff_tasks_url || $staff_clock_
 
   </div><!-- .eg-container -->
 </main>
+
+<!-- PUBLIC EVENT POP-UP -->
+<div class="eg-modal" id="eg-event-modal" hidden>
+  <div class="eg-modal__overlay" data-eg-close></div>
+  <div class="eg-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="eg-modal-title" tabindex="-1">
+    <button type="button" class="eg-modal__close" data-eg-close aria-label="<?php esc_attr_e( 'Close', 'eggplant' ); ?>">&times;</button>
+    <img class="eg-modal__img" id="eg-modal-img" alt="" hidden>
+    <span class="eg-modal__badge"><?php esc_html_e( 'Public Event', 'eggplant' ); ?></span>
+    <h3 class="eg-modal__title" id="eg-modal-title"></h3>
+    <p class="eg-modal__meta" id="eg-modal-meta"></p>
+    <div class="eg-modal__desc" id="eg-modal-desc"></div>
+    <a class="eg-btn eg-btn--primary eg-modal__link" id="eg-modal-link" href="#" target="_blank" rel="noopener noreferrer" hidden><?php esc_html_e( 'Tickets & More Info', 'eggplant' ); ?></a>
+  </div>
+</div>
 
 <?php wp_footer(); ?>
 </body>

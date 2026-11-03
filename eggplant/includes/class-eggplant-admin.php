@@ -456,10 +456,12 @@ class Eggplant_Admin {
   // ------------------------------------------------------------------ page: bookings
 
   public function page_bookings(): void {
-    $bookings = Eggplant_DB::get_all_bookings();
+    $bookings    = Eggplant_DB::get_all_bookings();
+    $floor_names = Eggplant_Floor_Calendar::floor_names();
     ?>
     <div class="wrap eg-admin">
       <h1><?php esc_html_e( 'Booking Requests', 'eggplant' ); ?></h1>
+      <p class="description"><?php esc_html_e( 'Approving a request automatically books the requested floor on the Floor Calendar as a PRIVATE EVENT (if the floor is still free). Declining it frees the floor again.', 'eggplant' ); ?></p>
       <?php if ( empty( $bookings ) ) : ?>
         <p><?php esc_html_e( 'No booking requests yet.', 'eggplant' ); ?></p>
       <?php else : ?>
@@ -472,6 +474,7 @@ class Eggplant_Admin {
             <th><?php esc_html_e( 'Phone', 'eggplant' ); ?></th>
             <th><?php esc_html_e( 'Event Type', 'eggplant' ); ?></th>
             <th><?php esc_html_e( 'Requested Date', 'eggplant' ); ?></th>
+            <th><?php esc_html_e( 'Floor', 'eggplant' ); ?></th>
             <th><?php esc_html_e( 'Time Slot', 'eggplant' ); ?></th>
             <th><?php esc_html_e( 'Message', 'eggplant' ); ?></th>
             <th><?php esc_html_e( 'Status', 'eggplant' ); ?></th>
@@ -486,6 +489,7 @@ class Eggplant_Admin {
             <td><?php echo esc_html( $booking['phone'] ); ?></td>
             <td><?php echo esc_html( $booking['event_type'] ); ?></td>
             <td><?php echo esc_html( $booking['event_date'] ); ?></td>
+            <td><?php echo esc_html( $floor_names[ $booking['floor'] ?? '' ] ?? '' ); ?></td>
             <td><?php
               if ( $booking['start_time'] ) {
                 echo esc_html( substr( $booking['start_time'], 0, 5 ) . ' – ' . substr( $booking['end_time'], 0, 5 ) );
@@ -704,6 +708,14 @@ class Eggplant_Admin {
               <th><?php esc_html_e( 'Show Booking Form', 'eggplant' ); ?></th>
               <td><input type="checkbox" name="show_booking_form" value="1" <?php checked( $settings['show_booking_form'], 1 ); ?>></td>
             </tr>
+            <tr>
+              <th><?php esc_html_e( 'Floor 1 Name', 'eggplant' ); ?></th>
+              <td><input type="text" name="floor_1_name" value="<?php echo esc_attr( $settings['floor_1_name'] ); ?>" class="regular-text"></td>
+            </tr>
+            <tr>
+              <th><?php esc_html_e( 'Floor 2 Name', 'eggplant' ); ?></th>
+              <td><input type="text" name="floor_2_name" value="<?php echo esc_attr( $settings['floor_2_name'] ); ?>" class="regular-text"></td>
+            </tr>
           </table>
         </div>
 
@@ -719,6 +731,9 @@ class Eggplant_Admin {
               'available_color' => __( 'Calendar: Available Day', 'eggplant' ),
               'booked_color'    => __( 'Calendar: Booked Day',    'eggplant' ),
               'held_color'      => __( 'Calendar: Held Day',      'eggplant' ),
+              'private_color'   => __( 'Calendar: Private Event', 'eggplant' ),
+              'public_color'    => __( 'Calendar: Public Event',  'eggplant' ),
+              'blocked_color'   => __( 'Calendar: Unavailable',   'eggplant' ),
             );
             foreach ( $color_fields as $key => $label ) :
             ?>
@@ -819,12 +834,14 @@ class Eggplant_Admin {
   }
 
   private function save_settings(): void {
-    $color_keys = array( 'bg_color', 'primary_color', 'secondary_color', 'text_color', 'available_color', 'booked_color', 'held_color' );
+    $color_keys = array( 'bg_color', 'primary_color', 'secondary_color', 'text_color', 'available_color', 'booked_color', 'held_color', 'private_color', 'public_color', 'blocked_color' );
     $data = array();
 
     $data['portal_title']      = sanitize_text_field( wp_unslash( $_POST['portal_title']      ?? '' ) );
     $data['contact_email']     = sanitize_email( wp_unslash( $_POST['contact_email']          ?? '' ) );
     $data['show_booking_form'] = ! empty( $_POST['show_booking_form'] ) ? 1 : 0;
+    $data['floor_1_name']      = sanitize_text_field( wp_unslash( $_POST['floor_1_name'] ?? '' ) );
+    $data['floor_2_name']      = sanitize_text_field( wp_unslash( $_POST['floor_2_name'] ?? '' ) );
     $data['carousel_autoplay'] = ! empty( $_POST['carousel_autoplay'] ) ? 1 : 0;
     $data['carousel_speed']    = max( 500, intval( $_POST['carousel_speed'] ?? 5000 ) );
     $data['custom_css']        = wp_strip_all_tags( wp_unslash( $_POST['custom_css'] ?? '' ) ); // Admin-only; HTML tags removed; CSS is trusted.
@@ -953,6 +970,48 @@ class Eggplant_Admin {
     $id     = intval( $_POST['id']     ?? 0 );
     $status = sanitize_text_field( wp_unslash( $_POST['status'] ?? '' ) );
     $ok     = Eggplant_DB::update_booking_status( $id, $status );
-    $ok ? wp_send_json_success() : wp_send_json_error( 'Update failed.' );
+    if ( ! $ok ) {
+      wp_send_json_error( 'Update failed.' );
+    }
+    wp_send_json_success( array( 'floor_message' => $this->sync_booking_floor( $id, $status ) ) );
+  }
+
+  /**
+   * Keep the Floor Calendar in sync with a booking request's status.
+   *
+   * @return string Human-readable result, empty when nothing changed.
+   */
+  private function sync_booking_floor( int $booking_id, string $status ): string {
+    $booking = Eggplant_DB::get_booking( $booking_id );
+    if ( ! $booking || empty( $booking['floor'] ) || empty( $booking['event_date'] ) ) {
+      return '';
+    }
+    $date  = $booking['event_date'];
+    $floor = $booking['floor'];
+
+    if ( 'approved' !== $status ) {
+      Eggplant_Floor_Calendar::delete_for_booking( $booking_id );
+      return '';
+    }
+
+    $existing = Eggplant_Floor_Calendar::get_day( $date, $floor );
+    if ( $existing && (int) $existing['booking_id'] !== $booking_id ) {
+      return __( 'Note: that floor is already booked or blocked on this date, so the Floor Calendar was not changed.', 'eggplant' );
+    }
+    if ( $existing ) {
+      return '';
+    }
+
+    $claimed = Eggplant_Floor_Calendar::save_day( $date, $floor, array(
+      'status'     => 'booked',
+      'visibility' => 'private',
+      'title'      => $booking['event_type'] ? $booking['event_type'] : $booking['name'],
+      'note'       => $booking['name'] . ' – ' . $booking['email'],
+      'booking_id' => $booking_id,
+    ), true );
+    if ( ! $claimed ) {
+      return __( 'Note: that floor is already booked or blocked on this date, so the Floor Calendar was not changed.', 'eggplant' );
+    }
+    return __( 'Floor booked on the Floor Calendar.', 'eggplant' );
   }
 }

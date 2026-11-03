@@ -89,12 +89,34 @@ class Eggplant_Activator {
       event_type   VARCHAR(200) DEFAULT '',
       event_date   DATE,
       time_slot_id BIGINT UNSIGNED,
+      floor        VARCHAR(20) DEFAULT '',
       message      TEXT,
       status       ENUM('new','reviewed','approved','declined') NOT NULL DEFAULT 'new',
       created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (id),
       KEY status (status),
       KEY event_date (event_date)
+    ) $charset_collate;";
+
+    // Floor calendar: one row per floor per date (booked event or blocked day).
+    $sql_floor_days = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}eggplant_floor_days (
+      id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      day_date    DATE NOT NULL,
+      floor       VARCHAR(20) NOT NULL,
+      status      ENUM('booked','blocked') NOT NULL DEFAULT 'booked',
+      visibility  ENUM('private','public') NOT NULL DEFAULT 'private',
+      title       VARCHAR(255) DEFAULT '',
+      description TEXT,
+      start_time  TIME NULL,
+      end_time    TIME NULL,
+      image_url   TEXT,
+      link_url    TEXT,
+      note        VARCHAR(255) DEFAULT '',
+      booking_id  BIGINT UNSIGNED NULL,
+      created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY day_floor (day_date, floor),
+      KEY booking_id (booking_id)
     ) $charset_collate;";
 
     // Recurring operational tasks table.
@@ -387,6 +409,12 @@ class Eggplant_Activator {
     if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
       error_log( 'Eggplant dbDelta error (eggplant_bookings): ' . $wpdb->last_error );
     }
+    dbDelta( $sql_floor_days );
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
+      error_log( 'Eggplant dbDelta error (eggplant_floor_days): ' . $wpdb->last_error );
+    }
+    // dbDelta cannot add columns to tables declared with IF NOT EXISTS, so add new columns explicitly.
+    self::ensure_column( 'eggplant_bookings', 'floor', "VARCHAR(20) DEFAULT '' AFTER time_slot_id" );
     dbDelta( $sql_tasks );
     if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
       error_log( 'Eggplant dbDelta error (eggplant_tasks): ' . $wpdb->last_error );
@@ -440,6 +468,24 @@ class Eggplant_Activator {
     update_option( 'eggplant_db_version', EGGPLANT_DB_VERSION );
   }
 
+  /**
+   * Add a column to an existing plugin table if it is missing.
+   *
+   * @param string $table      Table name without prefix.
+   * @param string $column     Column name.
+   * @param string $definition Column definition SQL (internal constant, never user input).
+   */
+  private static function ensure_column( string $table, string $column, string $definition ): void {
+    global $wpdb;
+    $full = $wpdb->prefix . $table;
+    // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- internal table name.
+    $exists = $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM {$full} LIKE %s", $column ) );
+    if ( ! $exists ) {
+      // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- internal identifiers.
+      $wpdb->query( "ALTER TABLE {$full} ADD COLUMN {$column} {$definition}" );
+    }
+  }
+
   private static function set_default_settings(): void {
     require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-payroll.php';
 
@@ -452,6 +498,11 @@ class Eggplant_Activator {
       'available_color'      => '#2a9d8f',
       'booked_color'         => '#e63946',
       'held_color'           => '#f4a261',
+      'private_color'        => '#7b2cbf',
+      'public_color'         => '#1d7ed8',
+      'blocked_color'        => '#4a4a4a',
+      'floor_1_name'         => 'Main Floor',
+      'floor_2_name'         => 'Upper Floor',
       'carousel_speed'       => 5000,
       'carousel_autoplay'    => 1,
       'custom_css'           => '',

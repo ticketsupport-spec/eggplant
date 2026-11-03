@@ -52,51 +52,150 @@
   }
 
   /* ================================================================
-     CALENDAR
+     CALENDAR (two floors, one event per floor per day)
   ================================================================ */
   const calGrid    = document.getElementById('eg-calendar-grid');
   const calHeading = document.getElementById('eg-cal-heading');
   const slotDetail = document.getElementById('eg-slot-detail');
-  let calData = {};
+  const FLOORS     = EggplantData.floors || {};
+  const TODAY      = EggplantData.today || '';
+  const monthCache = {};
 
-  if (calGrid && calHeading && slotDetail) {
+  function padZ(n) { return String(n).padStart(2, '0'); }
+
+  function fetchMonth(ym) {
+    if (monthCache[ym]) return $.Deferred().resolve(monthCache[ym]).promise();
+    return $.get(ajaxUrl, { action: 'eggplant_get_calendar', nonce: nonce, month: ym })
+      .then(function (res) {
+        const data = (res && res.success && res.data) ? res.data : {};
+        monthCache[ym] = { slots: data.slots || {}, floors: data.floors || {} };
+        return monthCache[ym];
+      });
+  }
+
+  function floorState(entry, isPast) {
+    if (!entry) {
+      return isPast
+        ? { cls: 'past', text: '', short: '' }
+        : { cls: 'available', text: 'Available', short: 'Open' };
+    }
+    if (entry.status === 'blocked') return { cls: 'blocked', text: 'Unavailable', short: 'N/A' };
+    return entry.visibility === 'public'
+      ? { cls: 'public',  text: 'PUBLIC EVENT',  short: 'Public' }
+      : { cls: 'private', text: 'PRIVATE EVENT', short: 'Private' };
+  }
+
+  function formatDate(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  }
+
+  /* ── Public event pop-up ── */
+  const modal = document.getElementById('eg-event-modal');
+  let lastFocus = null;
+
+  function openEventModal(dateStr, floor, entry) {
+    if (!modal) return;
+    const img  = document.getElementById('eg-modal-img');
+    const link = document.getElementById('eg-modal-link');
+    const time = entry.start ? (entry.start + (entry.end ? ' – ' + entry.end : '')) : '';
+
+    document.getElementById('eg-modal-title').textContent = entry.title || 'Public Event';
+    document.getElementById('eg-modal-meta').textContent  =
+      formatDate(dateStr) + ' · ' + (FLOORS[floor] || '') + (time ? ' · ' + time : '');
+    // Description is sanitized server-side with wp_kses_post().
+    document.getElementById('eg-modal-desc').innerHTML = entry.description || '';
+
+    if (entry.image_url) { img.src = entry.image_url; img.alt = entry.title || ''; img.hidden = false; }
+    else { img.removeAttribute('src'); img.hidden = true; }
+
+    if (entry.link_url) { link.href = entry.link_url; link.hidden = false; }
+    else { link.hidden = true; }
+
+    lastFocus = document.activeElement;
+    modal.hidden = false;
+    document.body.classList.add('eg-modal-open');
+    modal.querySelector('.eg-modal__dialog').focus();
+  }
+
+  function closeEventModal() {
+    if (!modal || modal.hidden) return;
+    modal.hidden = true;
+    document.body.classList.remove('eg-modal-open');
+    if (lastFocus) lastFocus.focus();
+  }
+
+  if (modal) {
+    modal.addEventListener('click', function (e) {
+      if (e.target.closest('[data-eg-close]')) closeEventModal();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeEventModal();
+    });
+  }
+
+  /* ── Booking form helpers ── */
+  function updateFloorOptions(dateStr, floorsForDay) {
+    const sel = document.getElementById('eg-floor');
+    if (!sel) return;
+    Array.prototype.forEach.call(sel.options, function (opt) {
+      if (!opt.value) return;
+      const taken = !!(floorsForDay && floorsForDay[opt.value]);
+      opt.disabled = taken;
+      opt.textContent = FLOORS[opt.value] + (taken ? ' (not available)' : '');
+      if (taken && opt.selected) sel.value = '';
+    });
+  }
+
+  function loadSlotsForDate(dateStr, slots) {
+    const sel = document.getElementById('eg-time-slot');
+    if (!sel) return;
+    const open = (slots || []).filter(function (s) { return s.status === 'available'; });
+    sel.innerHTML = '<option value="">' + (open.length ? '— Select a time slot —' : '— No slots available —') + '</option>';
+    open.forEach(function (s) {
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = s.start.slice(0,5) + ' – ' + s.end.slice(0,5) + (s.label ? ' (' + s.label + ')' : '');
+      sel.appendChild(opt);
+    });
+  }
+
+  function prefillBooking(dateStr, floor) {
+    const dateInput = document.getElementById('eg-event-date');
+    if (!dateInput) return;
+    dateInput.value = dateStr;
+    const month = monthCache[dateStr.slice(0, 7)] || { slots: {}, floors: {} };
+    updateFloorOptions(dateStr, month.floors[dateStr]);
+    loadSlotsForDate(dateStr, (month.slots[dateStr] || {}).slots);
+    const floorSel = document.getElementById('eg-floor');
+    if (floorSel && floor) floorSel.value = floor;
+    const form = document.getElementById('eg-booking-section');
+    if (form) form.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  if (calGrid && calHeading) {
     const MONTHS = [
       'January','February','March','April','May','June',
       'July','August','September','October','November','December'
     ];
 
-    let   calYear  = new Date().getFullYear();
-    let   calMonth = new Date().getMonth() + 1; // 1-based
-    let   selectedDate = null;
-
-    function padZ(n) { return String(n).padStart(2, '0'); }
+    const todayParts = TODAY ? TODAY.split('-').map(Number) : [new Date().getFullYear(), new Date().getMonth() + 1];
+    let calYear  = todayParts[0];
+    let calMonth = todayParts[1];
+    let selectedDate = null;
 
     function loadCalendar(year, month) {
       calHeading.textContent = MONTHS[month - 1] + ' ' + year;
-      const ym = year + '-' + padZ(month);
-
-      $.get(ajaxUrl, {
-        action: 'eggplant_get_calendar',
-        nonce: nonce,
-        month: ym
-      }).done(function (res) {
-        if (res.success) {
-          calData = res.data || {};
-          renderCalendar(year, month);
-        }
+      fetchMonth(year + '-' + padZ(month)).done(function (data) {
+        if (year === calYear && month === calMonth) renderCalendar(year, month, data);
       });
     }
 
-    function renderCalendar(year, month) {
+    function renderCalendar(year, month, data) {
       calGrid.innerHTML = '';
-      const today  = new Date();
-      const todayS = today.getFullYear() + '-' + padZ(today.getMonth() + 1) + '-' + padZ(today.getDate());
-
-      // First day-of-week for the month (0=Sun).
-      const firstDow = new Date(year, month - 1, 1).getDay();
+      const firstDow    = new Date(year, month - 1, 1).getDay();
       const daysInMonth = new Date(year, month, 0).getDate();
 
-      // Empty cells before first day
       for (let i = 0; i < firstDow; i++) {
         const empty = document.createElement('div');
         empty.className = 'eg-calendar__day eg-day--empty';
@@ -105,20 +204,57 @@
 
       for (let d = 1; d <= daysInMonth; d++) {
         const dateStr = year + '-' + padZ(month) + '-' + padZ(d);
+        const isPast  = TODAY && dateStr < TODAY;
         const cell    = document.createElement('div');
-        cell.className = 'eg-calendar__day';
-        cell.textContent = d;
+        cell.className = 'eg-calendar__day eg-day--floors';
         cell.dataset.date = dateStr;
-
-        if (dateStr === todayS) cell.classList.add('eg-day--today');
-
-        const info = calData[dateStr];
-        if (info) {
-          cell.classList.add('eg-day--' + info.status);
-          cell.addEventListener('click', function () { showSlotDetail(dateStr, info); });
-        }
-
+        if (dateStr === TODAY) cell.classList.add('eg-day--today');
+        if (isPast) cell.classList.add('eg-day--past');
         if (selectedDate === dateStr) cell.classList.add('eg-day--selected');
+
+        const slotInfo = data.slots[dateStr];
+        const num = document.createElement(slotInfo ? 'button' : 'span');
+        num.className = 'eg-day__num';
+        num.textContent = d;
+        if (slotInfo && slotDetail) {
+          num.type = 'button';
+          num.classList.add('eg-day__num--slots');
+          num.title = 'View time slots';
+          num.addEventListener('click', function () { showSlotDetail(dateStr, slotInfo); });
+        }
+        cell.appendChild(num);
+
+        const dayFloors = data.floors[dateStr] || {};
+        Object.keys(FLOORS).forEach(function (floor) {
+          const entry = dayFloors[floor];
+          const state = floorState(entry, isPast);
+          const clickable = state.cls === 'public' || (state.cls === 'available' && EggplantData.showBookingForm);
+          const el = document.createElement(clickable ? 'button' : 'div');
+          el.className = 'eg-floor eg-floor--' + state.cls;
+          if (clickable) el.type = 'button';
+
+          let label = FLOORS[floor] + ': ' + (state.text || 'Past date');
+          if (state.cls === 'public' && entry.title) label += ' – ' + entry.title + ' (click for details)';
+          if (state.cls === 'available' && clickable) label += ' (click to request this floor)';
+          el.title = label;
+          el.setAttribute('aria-label', formatDate(dateStr) + ', ' + label);
+
+          const longTxt = document.createElement('span');
+          longTxt.className = 'eg-floor__text';
+          longTxt.textContent = state.text;
+          const shortTxt = document.createElement('span');
+          shortTxt.className = 'eg-floor__short';
+          shortTxt.textContent = state.short;
+          el.appendChild(longTxt);
+          el.appendChild(shortTxt);
+
+          if (state.cls === 'public') {
+            el.addEventListener('click', function () { openEventModal(dateStr, floor, entry); });
+          } else if (clickable) {
+            el.addEventListener('click', function () { prefillBooking(dateStr, floor); });
+          }
+          cell.appendChild(el);
+        });
 
         calGrid.appendChild(cell);
       }
@@ -126,13 +262,11 @@
 
     function showSlotDetail(dateStr, info) {
       selectedDate = dateStr;
-
-      // Highlight selected cell
       calGrid.querySelectorAll('.eg-calendar__day').forEach(function (c) {
         c.classList.toggle('eg-day--selected', c.dataset.date === dateStr);
       });
 
-      document.getElementById('eg-slot-detail-date').textContent = dateStr;
+      document.getElementById('eg-slot-detail-date').textContent = formatDate(dateStr);
       const list = document.getElementById('eg-slot-detail-list');
       list.innerHTML = '';
 
@@ -149,38 +283,12 @@
 
       slotDetail.hidden = false;
 
-      // Fill booking form date if present
-      const dateInput = document.getElementById('eg-event-date');
-      if (dateInput) {
-        dateInput.value = dateStr;
-        loadSlotsForDate(dateStr, info.slots);
-      }
-
-      // Scroll to booking form
       const bookBtn = document.getElementById('eg-slot-book-btn');
       if (bookBtn) {
-        bookBtn.onclick = function () {
-          const form = document.getElementById('eg-booking-section');
-          if (form) form.scrollIntoView({ behavior: 'smooth' });
-        };
+        bookBtn.onclick = function () { prefillBooking(dateStr, ''); };
       }
     }
 
-    function loadSlotsForDate(dateStr, slots) {
-      const sel = document.getElementById('eg-time-slot');
-      if (!sel) return;
-      sel.innerHTML = '<option value="">' + (slots && slots.length ? '— Select a time slot —' : '— No slots available —') + '</option>';
-      if (!slots) return;
-      slots.forEach(function (s) {
-        if (s.status !== 'available') return; // only show available
-        const opt = document.createElement('option');
-        opt.value = s.id;
-        opt.textContent = s.start.slice(0,5) + ' – ' + s.end.slice(0,5) + (s.label ? ' (' + s.label + ')' : '');
-        sel.appendChild(opt);
-      });
-    }
-
-    // Calendar nav
     document.getElementById('eg-cal-prev') && document.getElementById('eg-cal-prev').addEventListener('click', function () {
       calMonth--;
       if (calMonth < 1) { calMonth = 12; calYear--; }
@@ -192,33 +300,21 @@
       loadCalendar(calYear, calMonth);
     });
 
-    // Watch date input to reload slots
-    const dateInput = document.getElementById('eg-event-date');
-    if (dateInput) {
-      dateInput.addEventListener('change', function () {
-        const v = this.value;
-        if (!v) return;
-        const info = calData[v];
-        if (info) {
-          loadSlotsForDate(v, info.slots);
-        } else {
-          // Date not in calendar data – load fresh
-          const ym = v.slice(0, 7);
-          $.get(ajaxUrl, { action: 'eggplant_get_calendar', nonce: nonce, month: ym })
-            .done(function (res) {
-              if (res.success && res.data[v]) {
-                loadSlotsForDate(v, res.data[v].slots);
-              } else {
-                const sel = document.getElementById('eg-time-slot');
-                if (sel) sel.innerHTML = '<option value="">— No slots available —</option>';
-              }
-            });
-        }
-      });
-    }
-
-    // Initial load
     loadCalendar(calYear, calMonth);
+  }
+
+  // Watch the booking-form date input to refresh floor availability and slots.
+  const dateInputEl = document.getElementById('eg-event-date');
+  if (dateInputEl) {
+    if (TODAY) dateInputEl.min = TODAY;
+    dateInputEl.addEventListener('change', function () {
+      const v = this.value;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+      fetchMonth(v.slice(0, 7)).done(function (data) {
+        updateFloorOptions(v, data.floors[v]);
+        loadSlotsForDate(v, (data.slots[v] || {}).slots);
+      });
+    });
   }
 
   /* ================================================================
@@ -245,6 +341,7 @@
         phone:        $('#eg-phone').val(),
         event_type:   $('#eg-event-type').val(),
         event_date:   $('#eg-event-date').val(),
+        floor:        $('#eg-floor').val(),
         time_slot_id: $('#eg-time-slot').val(),
         message:      $('#eg-message').val()
       }).done(function (response) {
@@ -256,6 +353,7 @@
           bookingForm.reset();
           const sel = document.getElementById('eg-time-slot');
           if (sel) sel.innerHTML = '<option value="">— Choose a date first —</option>';
+          updateFloorOptions('', null);
         } else {
           res.className = 'eg-response--error';
           res.textContent = response.data || 'An error occurred. Please try again.';

@@ -2,6 +2,14 @@
 
 A WordPress plugin that transforms your site into a full-screen event-center portal with a carousel, availability calendar, booking-request form, and a complete admin panel.
 
+## Floor Calendar (Two Floors, One Booking Per Day)
+
+- Name your two floors in `/wp-admin/admin.php?page=eggplant-settings` (Floor 1 / Floor 2 Name) and choose the Private, Public and Unavailable calendar colors.
+- Manage bookings in `/wp-admin/admin.php?page=eggplant-floor-calendar`. Click a floor on any day to mark it **Booked** (as a **PRIVATE EVENT** or **PUBLIC EVENT**), **Unavailable**, or **Available** again.
+- Public events can have a title, times, description, image and tickets/info link. Visitors click a PUBLIC EVENT on the front-page calendar to see these details in a pop-up. Private event details and internal notes are never sent to the public site.
+- Use **Block Out Recurring Days** to block every selected weekday (e.g. every Tuesday, or Tue/Wed/Thu) on one or both floors for this week, this month, the month shown, the rest of the year, next year, or any custom range. Days that are already booked are skipped. **Unblock** removes only blocked days.
+- Visitors must choose a floor when requesting a booking; booked or unavailable floors cannot be requested. Approving a request in Booking Requests books that floor as a PRIVATE EVENT, and changing it from Approved frees the floor again.
+
 ## Staff Clock and Payroll
 
 - Use the `[eggplant_staff_clock]` shortcode on any page to show the front-end time clock for staff tablets or kiosks.

@@ -199,3 +199,40 @@
 .eg-row-low-stock td {
   background-color: #fef9c3 !important;
 }
+
+/* Floor calendar */
+.eg-fc-admin { max-width: 1200px; }
+.eg-fc-legend { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; margin: 1rem 0 0; }
+.eg-fc-legend li { display: flex; align-items: center; gap: .4rem; margin: 0; }
+.eg-fc-swatch { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+.eg-fc-nav { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
+.eg-fc-nav strong { font-size: 1.2rem; min-width: 170px; text-align: center; }
+.eg-fc-weekdays,
+.eg-fc-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.eg-fc-weekdays div { text-align: center; font-weight: 600; text-transform: uppercase; font-size: .75rem; color: #666; padding-bottom: .25rem; }
+.eg-fc-day { border: 1px solid #ddd; border-radius: 4px; padding: 4px; min-height: 110px; display: flex; flex-direction: column; gap: 3px; background: #fafafa; }
+.eg-fc-day--empty { border: 0; background: transparent; }
+.eg-fc-day--today { outline: 2px solid #2271b1; }
+.eg-fc-day--past { opacity: .55; }
+.eg-fc-day__num { font-weight: 700; font-size: .85rem; }
+.eg-fc-floor { flex: 1; display: flex; flex-direction: column; align-items: flex-start; text-align: left; border: 0; border-radius: 3px; padding: 3px 5px; cursor: pointer; color: #fff; font-size: .7rem; line-height: 1.25; overflow: hidden; }
+.eg-fc-floor:hover,
+.eg-fc-floor:focus { filter: brightness(1.12); outline: 2px solid #1d2327; }
+.eg-fc-floor__name { opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.eg-fc-floor__status { font-weight: 700; letter-spacing: .02em; }
+.eg-fc-floor__title { font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.eg-fc--available { background: var(--eg-available, #2a9d8f); }
+.eg-fc--private   { background: var(--eg-private, #7b2cbf); }
+.eg-fc--public    { background: var(--eg-public, #1d7ed8); }
+.eg-fc--blocked   { background: var(--eg-blocked, #4a4a4a); }
+.eg-fc-weekday-picks,
+.eg-fc-presets { display: flex; flex-wrap: wrap; gap: .4rem .9rem; }
+.eg-fc-presets .button + .button { margin-left: 0 !important; }
+.eg-fc-check { font-weight: 400 !important; min-width: 0 !important; }
+.eg-form-row input[type="date"] { min-width: 150px; }
+#eg-fc-editor[hidden] { display: none; }
+@media (max-width: 782px) {
+  .eg-fc-day { min-height: 80px; }
+  .eg-fc-floor__name,
+  .eg-fc-floor__title { display: none; }
+}
