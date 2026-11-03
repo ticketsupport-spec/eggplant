@@ -149,14 +149,55 @@ class Eggplant_Floor_Calendar {
   public static function get_month( string $year_month ): array {
     $start = $year_month . '-01';
     $end   = gmdate( 'Y-m-t', strtotime( $start . ' 00:00:00 UTC' ) );
-    return self::get_range( $start, $end );
+    return self::get_calendar_range( $start, $end );
+  }
+
+  /** Merge time-slot occupancy without writing over independently managed floor days. */
+  private static function get_calendar_range( string $start, string $end ): array {
+    $days = array();
+    foreach ( self::get_range( $start, $end ) as $row ) {
+      $days[ $row['day_date'] . '|' . $row['floor'] ] = $row;
+    }
+    foreach ( self::get_slot_days( $start, $end ) as $key => $row ) {
+      if ( ! isset( $days[ $key ] ) ) {
+        $days[ $key ] = $row;
+      }
+    }
+    return array_values( $days );
+  }
+
+  /** @return array<string,array<string,mixed>> */
+  private static function get_slot_days( string $start, string $end ): array {
+    $days = array();
+    foreach ( Eggplant_DB::get_occupied_slots( $start, $end ) as $slot ) {
+      foreach ( self::booking_floors( $slot['floor'] ) as $floor ) {
+        $key = $slot['slot_date'] . '|' . $floor;
+        if ( ! isset( $days[ $key ] ) ) {
+          $days[ $key ] = array(
+            'day_date' => $slot['slot_date'], 'floor' => $floor,
+            'status' => 'blocked', 'visibility' => 'private',
+            'title' => __( 'Time slots', 'eggplant' ), 'description' => '',
+            'start_time' => '', 'end_time' => '', 'image_url' => '', 'link_url' => '',
+            'note' => '', 'booking_id' => null, 'time_slots' => true,
+          );
+        }
+        if ( 'booked' === $slot['status'] ) {
+          $days[ $key ]['status'] = 'booked';
+        }
+        $days[ $key ]['note'] .= ( $days[ $key ]['note'] ? '; ' : '' )
+          . substr( $slot['start_time'], 0, 5 ) . ' - ' . substr( $slot['end_time'], 0, 5 )
+          . ( $slot['label'] ? ' (' . $slot['label'] . ')' : '' );
+      }
+    }
+    return $days;
   }
 
   /**
    * Whether a floor is free (no booking or block) on a date.
    */
   public static function is_available( string $date, string $floor ): bool {
-    return null === self::get_day( $date, $floor );
+    return null === self::get_day( $date, $floor )
+      && ! isset( self::get_slot_days( $date, $date )[ $date . '|' . $floor ] );
   }
 
   /**
@@ -170,6 +211,9 @@ class Eggplant_Floor_Calendar {
     global $wpdb;
 
     if ( ! self::is_valid_date( $date ) || ! in_array( $floor, self::FLOORS, true ) ) {
+      return false;
+    }
+    if ( $only_if_free && ! self::is_available( $date, $floor ) ) {
       return false;
     }
 
@@ -252,8 +296,8 @@ class Eggplant_Floor_Calendar {
     }
 
     $existing = array();
-    foreach ( self::get_range( $start, $end ) as $row ) {
-      $existing[ $row['day_date'] . '|' . $row['floor'] ] = $row['status'];
+    foreach ( self::get_calendar_range( $start, $end ) as $row ) {
+      $existing[ $row['day_date'] . '|' . $row['floor'] ] = ! empty( $row['time_slots'] ) ? 'booked' : $row['status'];
     }
 
     $changed = 0;
@@ -321,7 +365,7 @@ class Eggplant_Floor_Calendar {
   }
 
   public static function enqueue_admin_assets( string $hook ): void {
-    if ( 'event-portal_page_eggplant-floor-calendar' !== $hook ) {
+    if ( ! in_array( $hook, array( 'event-portal_page_eggplant-floor-calendar', 'event-portal_page_eggplant-slots' ), true ) ) {
       return;
     }
     wp_enqueue_style( 'eggplant-admin', EGGPLANT_PLUGIN_URL . 'admin/css/admin.css', array(), EGGPLANT_VERSION );
@@ -338,10 +382,12 @@ class Eggplant_Floor_Calendar {
       'nonce'   => wp_create_nonce( 'eggplant_admin_nonce' ),
       'floors'  => self::floor_names(),
       'today'   => current_time( 'Y-m-d' ),
+      'readOnly' => 'event-portal_page_eggplant-slots' === $hook,
+      'slotsUrl' => admin_url( 'admin.php?page=eggplant-slots' ),
     ) );
   }
 
-  public static function render_admin_page(): void {
+  public static function render_admin_page( bool $read_only = false ): void {
     $floors   = self::floor_names();
     $weekdays = array(
       0 => __( 'Sun', 'eggplant' ),
@@ -356,7 +402,11 @@ class Eggplant_Floor_Calendar {
     <div class="wrap eg-admin eg-fc-admin">
       <h1><?php esc_html_e( 'Floor Calendar', 'eggplant' ); ?></h1>
       <p class="description">
-        <?php esc_html_e( 'Each floor can hold one booking per day. Click a floor on any day to book it (private or public event), mark it unavailable, or make it available again.', 'eggplant' ); ?>
+        <?php if ( $read_only ) : ?>
+          <?php esc_html_e( 'Booked time slots show as private events; holds show as unavailable. Times remain in the list above. Availability is per floor for the whole day.', 'eggplant' ); ?>
+        <?php else : ?>
+          <?php esc_html_e( 'Each floor can hold one booking per day. Click a floor on any day to book it (private or public event), mark it unavailable, or make it available again. Manage time-slot bookings on the Time Slots page.', 'eggplant' ); ?>
+        <?php endif; ?>
       </p>
 
       <ul class="eg-fc-legend">
@@ -380,6 +430,13 @@ class Eggplant_Floor_Calendar {
         </div>
         <div class="eg-fc-grid" id="eg-fc-grid" aria-live="polite"></div>
       </div>
+
+      <?php
+      if ( $read_only ) {
+        echo '</div>';
+        return;
+      }
+      ?>
 
       <!-- Day editor -->
       <div class="eg-card" id="eg-fc-editor" hidden>
@@ -520,6 +577,7 @@ class Eggplant_Floor_Calendar {
         'link_url'    => $row['link_url'],
         'note'        => $row['note'],
         'booking_id'  => $row['booking_id'] ? (int) $row['booking_id'] : 0,
+        'time_slots'  => ! empty( $row['time_slots'] ),
       );
     }
     wp_send_json_success( $out );
@@ -533,6 +591,9 @@ class Eggplant_Floor_Calendar {
 
     if ( ! self::is_valid_date( $date ) || ! in_array( $floor, self::FLOORS, true ) ) {
       wp_send_json_error( __( 'Invalid date or floor.', 'eggplant' ) );
+    }
+    if ( ! self::get_day( $date, $floor ) && ! self::is_available( $date, $floor ) ) {
+      wp_send_json_error( __( 'Manage this reservation on the Time Slots page.', 'eggplant' ) );
     }
 
     if ( 'available' === $status ) {
@@ -564,6 +625,9 @@ class Eggplant_Floor_Calendar {
     $floor = sanitize_key( wp_unslash( $_POST['floor'] ?? '' ) );
     if ( ! self::is_valid_date( $date ) || ! in_array( $floor, self::FLOORS, true ) ) {
       wp_send_json_error( __( 'Invalid date or floor.', 'eggplant' ) );
+    }
+    if ( ! self::get_day( $date, $floor ) && ! self::is_available( $date, $floor ) ) {
+      wp_send_json_error( __( 'Manage this reservation on the Time Slots page.', 'eggplant' ) );
     }
     self::delete_day( $date, $floor ) ? wp_send_json_success() : wp_send_json_error( __( 'Could not clear this day.', 'eggplant' ) );
   }

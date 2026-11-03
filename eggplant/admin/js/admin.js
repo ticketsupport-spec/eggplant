@@ -13,40 +13,100 @@
      TIME SLOTS PAGE
   ================================================================ */
 
-  // Add slot
+  function resetSlotForm() {
+    $('#eg-add-slot-form')[0].reset();
+    $('#eg-slot-id').val('');
+    $('#eg-slot-form-title').text('Add Time Slot');
+    $('#eg-slot-submit').text('Add Slot');
+    $('#eg-slot-cancel').prop('hidden', true);
+  }
+
+  $('#eg-slot-cancel').on('click', function () {
+    resetSlotForm();
+    $('#eg-add-slot-msg').text('');
+  });
+
+  $(document).on('click', '.eg-edit-slot', function () {
+    const msg = $('#eg-add-slot-msg');
+    msg.removeClass('eg-msg--success eg-msg--error').text('Loading...');
+    $.get(ajaxUrl, { action: 'eggplant_admin_get_slots', nonce: nonce, id: $(this).data('id') })
+      .done(function (res) {
+        if (!res.success) {
+          msg.addClass('eg-msg--error').text(res.data || 'Could not load time slot.');
+          return;
+        }
+        const slot = res.data;
+        $('#eg-slot-id').val(slot.id);
+        $('#eg-slot-date').val(slot.slot_date);
+        $('#eg-slot-start').val(slot.start_time.slice(0, 5));
+        $('#eg-slot-end').val(slot.end_time.slice(0, 5));
+        $('#eg-slot-floor').val(slot.floor);
+        $('#eg-slot-label').val(slot.label);
+        $('#eg-slot-status').val(slot.status);
+        $('#eg-slot-form-title').text('Edit Time Slot');
+        $('#eg-slot-submit').text('Save Changes');
+        $('#eg-slot-cancel').prop('hidden', false);
+        msg.text('');
+        document.getElementById('eg-add-slot-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }).fail(function () {
+        msg.addClass('eg-msg--error').text('Could not load time slot. Network error.');
+      });
+  });
+
+  // Add or edit slot.
   $('#eg-add-slot-form').on('submit', function (e) {
     e.preventDefault();
     const msg = $('#eg-add-slot-msg');
     msg.removeClass('eg-msg--success eg-msg--error').text('Saving…');
 
+    const id = $('#eg-slot-id').val();
+    const submit = $('#eg-slot-submit').prop('disabled', true);
     $.post(ajaxUrl, {
-      action:     'eggplant_admin_add_slot',
+      action:     id ? 'eggplant_admin_update_slot' : 'eggplant_admin_add_slot',
       nonce:      nonce,
+      id:         id,
       slot_date:  $('#eg-slot-date').val(),
       start_time: $('#eg-slot-start').val(),
       end_time:   $('#eg-slot-end').val(),
+      floor:      $('#eg-slot-floor').val(),
       label:      $('#eg-slot-label').val(),
       status:     $('#eg-slot-status').val()
     }).done(function (res) {
       if (res.success) {
-        msg.addClass('eg-msg--success').text('Slot added!');
-        $('#eg-add-slot-form')[0].reset();
+        msg.addClass('eg-msg--success').text(id ? 'Slot updated!' : 'Slot added!');
+        resetSlotForm();
         reloadSlotsTable();
+        $(document).trigger('eggplant:slots-changed');
       } else {
         msg.addClass('eg-msg--error').text('Error: ' + (res.data || 'Unknown error'));
       }
     }).fail(function () {
       msg.addClass('eg-msg--error').text('Network error.');
+    }).always(function () {
+      submit.prop('disabled', false);
     });
   });
 
-  // Update slot status (inline select)
-  $(document).on('change', '.eg-slot-status-select', function () {
-    const id     = $(this).data('id');
-    const status = $(this).val();
-    $.post(ajaxUrl, { action: 'eggplant_admin_update_slot', nonce: nonce, id: id, status: status })
+  // Update slot status or floor inline.
+  $(document).on('change', '.eg-slot-status-select, .eg-slot-floor-select', function () {
+    const select = $(this);
+    const field = select.hasClass('eg-slot-floor-select') ? 'floor' : 'status';
+    const payload = { action: 'eggplant_admin_update_slot', nonce: nonce, id: select.data('id') };
+    payload[field] = select.val();
+    select.prop('disabled', true);
+    $.post(ajaxUrl, payload)
       .done(function (res) {
-        if (!res.success) alert('Could not update slot status.');
+        if (!res.success) {
+          alert(res.data || 'Could not update slot.');
+        } else {
+          if ($('#eg-slot-id').val() === String(payload.id)) $('#eg-slot-' + field).val(payload[field]);
+          $(document).trigger('eggplant:slots-changed');
+        }
+      }).fail(function () {
+        alert('Could not update slot. Network error.');
+      }).always(function () {
+        select.prop('disabled', false);
+        reloadSlotsTable();
       });
   });
 
@@ -59,39 +119,54 @@
       .done(function (res) {
         if (res.success) {
           row.fadeOut(300, function () { row.remove(); });
+          if ($('#eg-slot-id').val() === String(id)) resetSlotForm();
+          $(document).trigger('eggplant:slots-changed');
         } else {
           alert('Could not delete slot.');
         }
+      }).fail(function () {
+        alert('Could not delete slot. Network error.');
       });
   });
 
   function reloadSlotsTable() {
     $.get(ajaxUrl, { action: 'eggplant_admin_get_slots', nonce: nonce }).done(function (res) {
-      if (!res.success) return;
+      if (!res.success) {
+        $('#eg-add-slot-msg').addClass('eg-msg--error').text(res.data || 'Could not reload time slots.');
+        return;
+      }
       const wrap = $('#eg-slots-table-wrap');
       if (!res.data || !res.data.length) {
         wrap.html('<p>No time slots yet.</p>');
         return;
       }
       let html = '<table class="widefat striped eg-slots-table"><thead><tr>' +
-        '<th>Date</th><th>Start</th><th>End</th><th>Label</th><th>Status</th><th>Actions</th>' +
+        '<th>Date</th><th>Start</th><th>End</th><th>Floor</th><th>Label</th><th>Status</th><th>Actions</th>' +
         '</tr></thead><tbody>';
       res.data.forEach(function (s) {
         html += '<tr id="eg-slot-row-' + s.id + '">' +
           '<td>' + esc(s.slot_date) + '</td>' +
           '<td>' + esc(s.start_time.slice(0,5)) + '</td>' +
           '<td>' + esc(s.end_time.slice(0,5)) + '</td>' +
+          '<td><select class="eg-slot-floor-select" data-id="' + s.id + '" aria-label="Floor">' +
+            Object.keys(EggplantAdmin.floors).map(function (floor) {
+              return opt(floor, s.floor, EggplantAdmin.floors[floor]);
+            }).join('') +
+          '</select></td>' +
           '<td>' + esc(s.label) + '</td>' +
           '<td><select class="eg-slot-status-select" data-id="' + s.id + '">' +
             opt('available', s.status, 'Available') +
             opt('held',      s.status, 'Hold') +
             opt('booked',    s.status, 'Booked') +
           '</select></td>' +
-          '<td><button class="button eg-delete-slot" data-id="' + s.id + '">Delete</button></td>' +
+          '<td><button type="button" class="button eg-edit-slot" data-id="' + s.id + '">Edit</button> ' +
+          '<button class="button eg-delete-slot" data-id="' + s.id + '">Delete</button></td>' +
           '</tr>';
       });
       html += '</tbody></table>';
       wrap.html(html);
+    }).fail(function () {
+      $('#eg-add-slot-msg').addClass('eg-msg--error').text('Could not reload time slots. Network error.');
     });
   }
 
@@ -223,7 +298,7 @@
   }
 
   function opt(value, current, label) {
-    return '<option value="' + value + '"' + (value === current ? ' selected' : '') + '>' + label + '</option>';
+    return '<option value="' + value + '"' + (value === current ? ' selected' : '') + '>' + esc(label) + '</option>';
   }
 
 }(jQuery));

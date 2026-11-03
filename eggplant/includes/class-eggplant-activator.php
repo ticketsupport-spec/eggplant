@@ -53,6 +53,7 @@ class Eggplant_Activator {
       slot_date   DATE NOT NULL,
       start_time  TIME NOT NULL,
       end_time    TIME NOT NULL,
+      floor       VARCHAR(20) NOT NULL DEFAULT 'both',
       label       VARCHAR(200) DEFAULT '',
       status      ENUM('available','booked','held') NOT NULL DEFAULT 'available',
       created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -415,6 +416,7 @@ class Eggplant_Activator {
     }
     // dbDelta cannot add columns to tables declared with IF NOT EXISTS, so add new columns explicitly.
     self::ensure_column( 'eggplant_bookings', 'floor', "VARCHAR(20) DEFAULT '' AFTER time_slot_id" );
+    self::ensure_column( 'eggplant_time_slots', 'floor', "VARCHAR(20) NOT NULL DEFAULT 'both'" );
     dbDelta( $sql_tasks );
     if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
       error_log( 'Eggplant dbDelta error (eggplant_tasks): ' . $wpdb->last_error );

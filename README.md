@@ -10,6 +10,16 @@ A WordPress plugin that transforms your site into a full-screen event-center por
 - Use **Block Out Recurring Days** to block every selected weekday (e.g. every Tuesday, or Tue/Wed/Thu) on one or both floors for this week, this month, the month shown, the rest of the year, next year, or any custom range. Days that are already booked are skipped. **Unblock** removes only blocked days.
 - Visitors choose the main floor, upstairs, or both floors when requesting a full-day booking; no preferred time is needed. Both floors can only be requested when both are available. Approving a request in Booking Requests books the requested floor(s) as a PRIVATE EVENT, and changing it from Approved frees them again.
 
+## Time Slots
+
+- On `/wp-admin/admin.php?page=eggplant-slots`, keep staff-facing start/end times and select the main floor, upper/top floor, or both (using your configured floor names).
+- Use **Edit** to change the date, times, floor, label, and status of an existing slot, then **Save Changes**. **Cancel** returns to adding slots. Floor and status can also be changed directly in the list.
+- A read-only floor calendar on this page refreshes after adding, editing, or deleting a slot. Booked slots color the selected floor(s) as **Private Event** on both calendars; held slots show as **Unavailable**. Available slots do not reserve a floor. Public time-slot details also show the selected floor.
+- Availability remains full-day per floor, even when a slot has start/end times. Multiple slots on the same floor/date keep it occupied until all booked/held slots are released or deleted. Existing slots are assigned to **Both Floors** on upgrade; edit their floor if needed.
+- Independently managed floor-calendar events and blocks are preserved and take display priority. Releasing a time slot never deletes those entries. To release a time-slot reservation, edit it on **Time Slots**, not **Floor Calendar**.
+
+Run the standalone regressions with `php tests/time-slots.php` (requires `pdo_sqlite`) and `node tests/time-slots-admin.js`.
+
 ## Staff Clock and Payroll
 
 - Use the `[eggplant_staff_clock]` shortcode on any page to show the front-end time clock for staff tablets or kiosks.

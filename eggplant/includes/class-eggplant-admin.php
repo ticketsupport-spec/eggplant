@@ -161,6 +161,7 @@ class Eggplant_Admin {
     wp_localize_script( 'eggplant-admin', 'EggplantAdmin', array(
       'ajaxUrl' => admin_url( 'admin-ajax.php' ),
       'nonce'   => wp_create_nonce( 'eggplant_admin_nonce' ),
+      'floors'  => Eggplant_Floor_Calendar::booking_floor_names(),
     ) );
   }
 
@@ -269,8 +270,9 @@ class Eggplant_Admin {
 
       <!-- Add slot form -->
       <div class="eg-card" id="eg-add-slot-card">
-        <h2><?php esc_html_e( 'Add Time Slot', 'eggplant' ); ?></h2>
+        <h2 id="eg-slot-form-title"><?php esc_html_e( 'Add Time Slot', 'eggplant' ); ?></h2>
         <form id="eg-add-slot-form">
+          <input type="hidden" id="eg-slot-id" value="">
           <div class="eg-form-row">
             <label><?php esc_html_e( 'Date', 'eggplant' ); ?></label>
             <input type="date" id="eg-slot-date" required>
@@ -284,6 +286,14 @@ class Eggplant_Admin {
             <input type="time" id="eg-slot-end" required>
           </div>
           <div class="eg-form-row">
+            <label for="eg-slot-floor"><?php esc_html_e( 'Floor', 'eggplant' ); ?></label>
+            <select id="eg-slot-floor" required>
+              <?php foreach ( Eggplant_Floor_Calendar::booking_floor_names() as $key => $name ) : ?>
+                <option value="<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $name ); ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="eg-form-row">
             <label><?php esc_html_e( 'Label (optional)', 'eggplant' ); ?></label>
             <input type="text" id="eg-slot-label" placeholder="<?php esc_attr_e( 'e.g. Evening Show', 'eggplant' ); ?>">
           </div>
@@ -295,7 +305,8 @@ class Eggplant_Admin {
               <option value="booked"><?php esc_html_e( 'Booked', 'eggplant' ); ?></option>
             </select>
           </div>
-          <button type="submit" class="button button-primary"><?php esc_html_e( 'Add Slot', 'eggplant' ); ?></button>
+          <button type="submit" class="button button-primary" id="eg-slot-submit"><?php esc_html_e( 'Add Slot', 'eggplant' ); ?></button>
+          <button type="button" class="button" id="eg-slot-cancel" hidden><?php esc_html_e( 'Cancel', 'eggplant' ); ?></button>
           <span class="eg-msg" id="eg-add-slot-msg"></span>
         </form>
       </div>
@@ -309,6 +320,7 @@ class Eggplant_Admin {
       </div>
     </div>
     <?php
+    Eggplant_Floor_Calendar::render_admin_page( true );
   }
 
   private function render_slots_table(): void {
@@ -324,6 +336,7 @@ class Eggplant_Admin {
           <th><?php esc_html_e( 'Date', 'eggplant' ); ?></th>
           <th><?php esc_html_e( 'Start', 'eggplant' ); ?></th>
           <th><?php esc_html_e( 'End', 'eggplant' ); ?></th>
+          <th><?php esc_html_e( 'Floor', 'eggplant' ); ?></th>
           <th><?php esc_html_e( 'Label', 'eggplant' ); ?></th>
           <th><?php esc_html_e( 'Status', 'eggplant' ); ?></th>
           <th><?php esc_html_e( 'Actions', 'eggplant' ); ?></th>
@@ -335,6 +348,13 @@ class Eggplant_Admin {
           <td><?php echo esc_html( $slot['slot_date'] ); ?></td>
           <td><?php echo esc_html( substr( $slot['start_time'], 0, 5 ) ); ?></td>
           <td><?php echo esc_html( substr( $slot['end_time'],   0, 5 ) ); ?></td>
+          <td>
+            <select class="eg-slot-floor-select" data-id="<?php echo esc_attr( $slot['id'] ); ?>" aria-label="<?php esc_attr_e( 'Floor', 'eggplant' ); ?>">
+              <?php foreach ( Eggplant_Floor_Calendar::booking_floor_names() as $key => $name ) : ?>
+                <option value="<?php echo esc_attr( $key ); ?>" <?php selected( $slot['floor'], $key ); ?>><?php echo esc_html( $name ); ?></option>
+              <?php endforeach; ?>
+            </select>
+          </td>
           <td><?php echo esc_html( $slot['label'] ); ?></td>
           <td>
             <select class="eg-slot-status-select" data-id="<?php echo esc_attr( $slot['id'] ); ?>">
@@ -344,6 +364,7 @@ class Eggplant_Admin {
             </select>
           </td>
           <td>
+            <button type="button" class="button eg-edit-slot" data-id="<?php echo esc_attr( $slot['id'] ); ?>"><?php esc_html_e( 'Edit', 'eggplant' ); ?></button>
             <button class="button eg-delete-slot" data-id="<?php echo esc_attr( $slot['id'] ); ?>"><?php esc_html_e( 'Delete', 'eggplant' ); ?></button>
           </td>
         </tr>
@@ -871,19 +892,37 @@ class Eggplant_Admin {
       wp_send_json_error( 'Unauthorized' );
     }
 
-    $id = Eggplant_DB::insert_slot( array(
-      'slot_date'  => sanitize_text_field( wp_unslash( $_POST['slot_date']  ?? '' ) ),
-      'start_time' => sanitize_text_field( wp_unslash( $_POST['start_time'] ?? '' ) ),
-      'end_time'   => sanitize_text_field( wp_unslash( $_POST['end_time']   ?? '' ) ),
-      'label'      => sanitize_text_field( wp_unslash( $_POST['label']      ?? '' ) ),
-      'status'     => sanitize_text_field( wp_unslash( $_POST['status']     ?? 'available' ) ),
-    ) );
-
+    $id = Eggplant_DB::insert_slot( $this->slot_data_from_request() );
     if ( $id ) {
       wp_send_json_success( array( 'id' => $id ) );
     } else {
       wp_send_json_error( 'Could not insert slot.' );
     }
+  }
+
+  /** @return array<string,string> */
+  private function slot_data_from_request(): array {
+    $date  = sanitize_text_field( wp_unslash( $_POST['slot_date'] ?? '' ) );
+    $start = sanitize_text_field( wp_unslash( $_POST['start_time'] ?? '' ) );
+    $end   = sanitize_text_field( wp_unslash( $_POST['end_time'] ?? '' ) );
+    $floor = sanitize_key( wp_unslash( $_POST['floor'] ?? '' ) );
+    $status = sanitize_key( wp_unslash( $_POST['status'] ?? '' ) );
+    if ( ! Eggplant_Floor_Calendar::is_valid_date( $date )
+      || ! preg_match( '/^([01]\d|2[0-3]):[0-5]\d$/', $start )
+      || ! preg_match( '/^([01]\d|2[0-3]):[0-5]\d$/', $end )
+      || ! Eggplant_Floor_Calendar::booking_floors( $floor )
+      || ! in_array( $status, array( 'available', 'held', 'booked' ), true ) ) {
+      wp_send_json_error( __( 'Please choose a valid date, start and end time, floor, and status.', 'eggplant' ) );
+    }
+
+    return array(
+      'slot_date'  => $date,
+      'start_time' => $start,
+      'end_time'   => $end,
+      'floor'      => $floor,
+      'label'      => sanitize_text_field( wp_unslash( $_POST['label']      ?? '' ) ),
+      'status'     => $status,
+    );
   }
 
   public function ajax_update_slot(): void {
@@ -892,8 +931,17 @@ class Eggplant_Admin {
       wp_send_json_error( 'Unauthorized' );
     }
     $id     = intval( $_POST['id']     ?? 0 );
+    if ( ! Eggplant_DB::get_slot( $id ) ) {
+      wp_send_json_error( __( 'Time slot not found. Refresh the page and try again.', 'eggplant' ) );
+    }
     $status = sanitize_text_field( wp_unslash( $_POST['status'] ?? '' ) );
-    $ok     = Eggplant_DB::update_slot_status( $id, $status );
+    if ( isset( $_POST['slot_date'] ) ) {
+      $ok = Eggplant_DB::update_slot( $id, $this->slot_data_from_request() );
+    } elseif ( isset( $_POST['floor'] ) ) {
+      $ok = Eggplant_DB::update_slot_floor( $id, sanitize_key( wp_unslash( $_POST['floor'] ) ) );
+    } else {
+      $ok = Eggplant_DB::update_slot_status( $id, $status );
+    }
     $ok ? wp_send_json_success() : wp_send_json_error( 'Update failed.' );
   }
 
@@ -911,6 +959,13 @@ class Eggplant_Admin {
     check_ajax_referer( 'eggplant_admin_nonce', 'nonce' );
     if ( ! current_user_can( 'manage_options' ) ) {
       wp_send_json_error( 'Unauthorized' );
+    }
+    if ( isset( $_GET['id'] ) ) {
+      $slot = Eggplant_DB::get_slot( intval( $_GET['id'] ) );
+      if ( ! $slot ) {
+        wp_send_json_error( __( 'Time slot not found.', 'eggplant' ) );
+      }
+      wp_send_json_success( $slot );
     }
     wp_send_json_success( Eggplant_DB::get_all_slots() );
   }
@@ -997,7 +1052,8 @@ class Eggplant_Admin {
     $free_floors = array();
     foreach ( $floors as $floor ) {
       $existing = Eggplant_Floor_Calendar::get_day( $date, $floor );
-      if ( $existing && (int) ( $existing['booking_id'] ?? 0 ) !== $booking_id ) {
+      if ( ( $existing && (int) ( $existing['booking_id'] ?? 0 ) !== $booking_id )
+        || ( ! $existing && ! Eggplant_Floor_Calendar::is_available( $date, $floor ) ) ) {
         return __( 'Note: a requested floor is already booked or blocked on this date, so the Floor Calendar was not changed.', 'eggplant' );
       }
       if ( ! $existing ) {

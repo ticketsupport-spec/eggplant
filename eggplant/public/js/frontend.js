@@ -266,7 +266,8 @@
         badge.className = 'eg-slot-badge eg-slot-badge--' + s.status;
         badge.textContent = s.status.charAt(0).toUpperCase() + s.status.slice(1);
         li.appendChild(badge);
-        li.appendChild(document.createTextNode(' ' + s.start.slice(0,5) + ' – ' + s.end.slice(0,5) + (s.label ? ' (' + s.label + ')' : '')));
+        li.appendChild(document.createTextNode(' ' + s.start.slice(0,5) + ' – ' + s.end.slice(0,5) +
+          (BOOKING_FLOORS[s.floor] ? ' · ' + BOOKING_FLOORS[s.floor] : '') + (s.label ? ' (' + s.label + ')' : '')));
         li.dataset.slotId = s.id;
         list.appendChild(li);
       });
