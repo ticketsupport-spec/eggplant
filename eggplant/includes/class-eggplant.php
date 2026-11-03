@@ -27,6 +27,7 @@ class Eggplant {
     require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-db-migrator.php';
     require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-payroll.php';
     require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-operations.php';
+    require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-floor-calendar.php';
     require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-frontend.php';
     require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-admin.php';
     require_once EGGPLANT_PLUGIN_DIR . 'includes/class-eggplant-ticketing.php';
@@ -40,6 +41,7 @@ class Eggplant {
     Eggplant_Operations::init();
     Eggplant_Ticketing::init();
     Eggplant_POS::init();
+    Eggplant_Floor_Calendar::init();
 
     new Eggplant_Frontend();
 

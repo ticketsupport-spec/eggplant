@@ -23,6 +23,7 @@ class Eggplant_DB_Migrator {
     'eggplant_time_slots',
     'eggplant_events',
     'eggplant_bookings',
+    'eggplant_floor_days',
     'eggplant_tasks',
     'eggplant_task_completions',
     'eggplant_staff',

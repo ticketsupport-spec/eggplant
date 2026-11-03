@@ -193,6 +193,7 @@
         if (res.success) {
           $this.closest('tr').find('td:first').css('border-left', '3px solid ' +
             ({ new: '#d63638', reviewed: '#f0ad00', approved: '#46b450', declined: '#999' }[status] || '#999'));
+          if (res.data && res.data.floor_message) alert(res.data.floor_message);
         } else {
           alert('Could not update status.');
         }

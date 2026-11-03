@@ -229,10 +229,11 @@ class Eggplant_DB {
         'event_type'   => sanitize_text_field( $data['event_type']   ?? '' ),
         'event_date'   => sanitize_text_field( $data['event_date']   ?? '' ) ?: null,
         'time_slot_id' => ! empty( $data['time_slot_id'] ) ? intval( $data['time_slot_id'] ) : null,
+        'floor'        => sanitize_key( $data['floor'] ?? '' ),
         'message'      => sanitize_textarea_field( $data['message']  ?? '' ),
         'status'       => 'new',
       ),
-      array( '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s' )
+      array( '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s' )
     );
     return $result ? $wpdb->insert_id : false;
   }
@@ -253,6 +254,20 @@ class Eggplant_DB {
       ARRAY_A
     );
     return $results ?: array();
+  }
+
+  /**
+   * Get a single booking request.
+   *
+   * @return array<string,mixed>|null
+   */
+  public static function get_booking( int $id ): ?array {
+    global $wpdb;
+    $row = $wpdb->get_row(
+      $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}eggplant_bookings WHERE id = %d", $id ),
+      ARRAY_A
+    );
+    return $row ?: null;
   }
 
   /**
