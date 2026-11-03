@@ -52,6 +52,24 @@ class Eggplant_Floor_Calendar {
     );
   }
 
+  /** @return array<string,string> */
+  public static function booking_floor_names(): array {
+    $names = self::floor_names();
+    return array(
+      'floor_1' => $names['floor_1'],
+      'both'    => __( 'Both Floors', 'eggplant' ),
+      'floor_2' => $names['floor_2'],
+    );
+  }
+
+  /** @return string[] */
+  public static function booking_floors( string $choice ): array {
+    if ( 'both' === $choice ) {
+      return self::FLOORS;
+    }
+    return in_array( $choice, self::FLOORS, true ) ? array( $choice ) : array();
+  }
+
   public static function is_valid_date( string $date ): bool {
     if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m ) ) {
       return false;

@@ -58,6 +58,7 @@
   const calHeading = document.getElementById('eg-cal-heading');
   const slotDetail = document.getElementById('eg-slot-detail');
   const FLOORS     = EggplantData.floors || {};
+  const BOOKING_FLOORS = EggplantData.bookingFloors || FLOORS;
   const TODAY      = EggplantData.today || '';
   const monthCache = {};
 
@@ -140,23 +141,13 @@
     if (!sel) return;
     Array.prototype.forEach.call(sel.options, function (opt) {
       if (!opt.value) return;
-      const taken = !!(floorsForDay && floorsForDay[opt.value]);
+      const requestedFloors = opt.value === 'both' ? Object.keys(FLOORS) : [opt.value];
+      const taken = requestedFloors.some(function (floor) {
+        return !!(floorsForDay && floorsForDay[floor]);
+      });
       opt.disabled = taken;
-      opt.textContent = FLOORS[opt.value] + (taken ? ' (not available)' : '');
+      opt.textContent = BOOKING_FLOORS[opt.value] + (taken ? ' (not available)' : '');
       if (taken && opt.selected) sel.value = '';
-    });
-  }
-
-  function loadSlotsForDate(dateStr, slots) {
-    const sel = document.getElementById('eg-time-slot');
-    if (!sel) return;
-    const open = (slots || []).filter(function (s) { return s.status === 'available'; });
-    sel.innerHTML = '<option value="">' + (open.length ? '— Select a time slot —' : '— No slots available —') + '</option>';
-    open.forEach(function (s) {
-      const opt = document.createElement('option');
-      opt.value = s.id;
-      opt.textContent = s.start.slice(0,5) + ' – ' + s.end.slice(0,5) + (s.label ? ' (' + s.label + ')' : '');
-      sel.appendChild(opt);
     });
   }
 
@@ -166,7 +157,6 @@
     dateInput.value = dateStr;
     const month = monthCache[dateStr.slice(0, 7)] || { slots: {}, floors: {} };
     updateFloorOptions(dateStr, month.floors[dateStr]);
-    loadSlotsForDate(dateStr, (month.slots[dateStr] || {}).slots);
     const floorSel = document.getElementById('eg-floor');
     if (floorSel && floor) floorSel.value = floor;
     const form = document.getElementById('eg-booking-section');
@@ -303,16 +293,22 @@
     loadCalendar(calYear, calMonth);
   }
 
-  // Watch the booking-form date input to refresh floor availability and slots.
+  // Watch the booking-form date input to refresh floor availability.
   const dateInputEl = document.getElementById('eg-event-date');
   if (dateInputEl) {
     if (TODAY) dateInputEl.min = TODAY;
+    dateInputEl.addEventListener('click', function () {
+      if (typeof this.showPicker === 'function') this.showPicker();
+    });
     dateInputEl.addEventListener('change', function () {
       const v = this.value;
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+        updateFloorOptions('', null);
+        return;
+      }
       fetchMonth(v.slice(0, 7)).done(function (data) {
+        if (dateInputEl.value !== v) return;
         updateFloorOptions(v, data.floors[v]);
-        loadSlotsForDate(v, (data.slots[v] || {}).slots);
       });
     });
   }
@@ -342,7 +338,6 @@
         event_type:   $('#eg-event-type').val(),
         event_date:   $('#eg-event-date').val(),
         floor:        $('#eg-floor').val(),
-        time_slot_id: $('#eg-time-slot').val(),
         message:      $('#eg-message').val()
       }).done(function (response) {
         btn.disabled = false;
@@ -351,8 +346,6 @@
           res.className = 'eg-response--success';
           res.textContent = response.data;
           bookingForm.reset();
-          const sel = document.getElementById('eg-time-slot');
-          if (sel) sel.innerHTML = '<option value="">— Choose a date first —</option>';
           updateFloorOptions('', null);
         } else {
           res.className = 'eg-response--error';
