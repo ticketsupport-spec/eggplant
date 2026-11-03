@@ -31,12 +31,23 @@
 
   function load() {
     heading.textContent = MONTHS[month - 1] + ' ' + year;
+    const requestedYear = year;
+    const requestedMonth = month;
     $.post(cfg.ajaxUrl, { action: 'eggplant_fc_get_month', nonce: cfg.nonce, month: year + '-' + pad(month) })
       .done(function (res) {
-        data = (res.success && res.data && !Array.isArray(res.data)) ? res.data : {};
+        if (requestedYear !== year || requestedMonth !== month) return;
+        if (!res.success) {
+          grid.textContent = 'Could not load calendar: ' + (res.data || 'Unknown error');
+          return;
+        }
+        data = (res.data && !Array.isArray(res.data)) ? res.data : {};
         render();
+      }).fail(function () {
+        if (requestedYear === year && requestedMonth === month) grid.textContent = 'Could not load calendar. Please try again.';
       });
   }
+
+  $(document).on('eggplant:slots-changed', load);
 
   function render() {
     grid.innerHTML = '';
@@ -64,8 +75,8 @@
       Object.keys(floors).forEach(function (floor) {
         const entry = (data[date] || {})[floor];
         const info  = statusInfo(entry);
-        const btn   = document.createElement('button');
-        btn.type = 'button';
+        const btn   = document.createElement(cfg.readOnly ? 'div' : 'button');
+        if (!cfg.readOnly) btn.type = 'button';
         btn.className = 'eg-fc-floor eg-fc--' + info.cls;
         btn.title = floors[floor] + ': ' + info.text + (entry && entry.title ? ' – ' + entry.title : '') + (entry && entry.note ? ' (' + entry.note + ')' : '');
 
@@ -83,8 +94,14 @@
           t.textContent = entry.title;
           btn.appendChild(t);
         }
+        if (entry && entry.time_slots && entry.note) {
+          const times = document.createElement('span');
+          times.className = 'eg-fc-floor__title';
+          times.textContent = entry.note;
+          btn.appendChild(times);
+        }
 
-        btn.addEventListener('click', function () { openEditor(date, floor); });
+        if (!cfg.readOnly) btn.addEventListener('click', function () { openEditor(date, floor); });
         cell.appendChild(btn);
       });
 
@@ -103,6 +120,8 @@
     const date  = $('#eg-fc-date').val();
     const floor = $('#eg-fc-floor').val();
     const entry = (data[date] || {})[floor] || null;
+    const slotDay = !!(entry && entry.time_slots);
+    $('#eg-fc-editor-form').find('input, textarea, select, button[type="submit"]').not('#eg-fc-floor').prop('disabled', slotDay);
 
     $('#eg-fc-status').val(entry ? entry.status : 'available');
     $('#eg-fc-visibility').val(entry && entry.visibility ? entry.visibility : 'private');
@@ -113,7 +132,12 @@
     $('#eg-fc-image').val(entry ? entry.image_url : '');
     $('#eg-fc-link').val(entry ? entry.link_url : '');
     $('#eg-fc-note').val(entry ? entry.note : '');
-    $('#eg-fc-editor-msg').removeClass('eg-msg--success eg-msg--error').text('');
+    $('#eg-fc-editor-msg').removeClass('eg-msg--success eg-msg--error').text(
+      slotDay ? 'Edit or release these bookings on the Time Slots page.' : ''
+    );
+    if (slotDay) {
+      $('<a>').attr('href', cfg.slotsUrl).text(' Manage time slots').appendTo('#eg-fc-editor-msg');
+    }
     toggleFields();
   }
 

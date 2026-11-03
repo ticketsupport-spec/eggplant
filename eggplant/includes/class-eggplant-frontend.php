@@ -186,6 +186,7 @@ class Eggplant_Frontend {
         'id'    => $slot['id'],
         'start' => $slot['start_time'],
         'end'   => $slot['end_time'],
+        'floor' => $slot['floor'],
         'label' => $slot['label'],
         'status'=> $slot['status'],
       );

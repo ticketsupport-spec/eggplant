@@ -14,22 +14,26 @@ class Eggplant_DB {
   /**
    * Insert a time slot.
    *
-   * @param array<string,mixed> $data  Keys: slot_date, start_time, end_time, label, status
+   * @param array<string,mixed> $data  Keys: slot_date, start_time, end_time, floor, label, status
    * @return int|false  Inserted row ID or false on failure.
    */
   public static function insert_slot( array $data ) {
     global $wpdb;
+    if ( ! Eggplant_Floor_Calendar::booking_floors( $data['floor'] ?? 'both' ) ) {
+      return false;
+    }
     $result = $wpdb->insert(
       $wpdb->prefix . 'eggplant_time_slots',
       array(
         'slot_date'  => sanitize_text_field( $data['slot_date']  ?? '' ),
         'start_time' => sanitize_text_field( $data['start_time'] ?? '' ),
         'end_time'   => sanitize_text_field( $data['end_time']   ?? '' ),
+        'floor'      => $data['floor'] ?? 'both',
         'label'      => sanitize_text_field( $data['label']      ?? '' ),
         'status'     => in_array( $data['status'] ?? 'available', array( 'available', 'booked', 'held' ), true )
                         ? $data['status'] : 'available',
       ),
-      array( '%s', '%s', '%s', '%s', '%s' )
+      array( '%s', '%s', '%s', '%s', '%s', '%s' )
     );
     return $result ? $wpdb->insert_id : false;
   }
@@ -53,6 +57,56 @@ class Eggplant_DB {
       array( '%d' )
     );
     return $result !== false;
+  }
+
+  public static function update_slot_floor( int $id, string $floor ): bool {
+    global $wpdb;
+    if ( ! Eggplant_Floor_Calendar::booking_floors( $floor ) ) {
+      return false;
+    }
+    return false !== $wpdb->update(
+      $wpdb->prefix . 'eggplant_time_slots',
+      array( 'floor' => $floor ),
+      array( 'id' => $id ),
+      array( '%s' ),
+      array( '%d' )
+    );
+  }
+
+  /** @return array<string,mixed>|null */
+  public static function get_slot( int $id ): ?array {
+    global $wpdb;
+    return $wpdb->get_row(
+      $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}eggplant_time_slots WHERE id = %d", $id ),
+      ARRAY_A
+    ) ?: null;
+  }
+
+  /** @param array<string,string> $data Validated slot fields. */
+  public static function update_slot( int $id, array $data ): bool {
+    global $wpdb;
+    return false !== $wpdb->update(
+      $wpdb->prefix . 'eggplant_time_slots',
+      $data,
+      array( 'id' => $id ),
+      array_fill( 0, count( $data ), '%s' ),
+      array( '%d' )
+    );
+  }
+
+  /** @return array<int,array<string,mixed>> */
+  public static function get_occupied_slots( string $start, string $end ): array {
+    global $wpdb;
+    return $wpdb->get_results(
+      $wpdb->prepare(
+        "SELECT * FROM {$wpdb->prefix}eggplant_time_slots
+         WHERE slot_date BETWEEN %s AND %s AND status IN ('booked','held')
+         ORDER BY slot_date, start_time, id",
+        $start,
+        $end
+      ),
+      ARRAY_A
+    ) ?: array();
   }
 
   /**
