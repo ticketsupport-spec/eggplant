@@ -161,11 +161,15 @@
         return;
       }
       let html = '<table class="widefat striped eg-slots-table"><thead><tr>' +
-        '<th>Date</th><th>Start</th><th>End</th><th>Floor</th><th>Label</th><th>Event Notes (admin only)</th><th>Status</th><th>Event Type</th><th>Actions</th>' +
+        '<th>Date</th><th>Start</th><th>End</th><th>Floor</th><th>Label</th><th>Event Notes (admin only)</th><th>Status</th><th>Event Type</th>' +
         '</tr></thead><tbody>';
       res.data.forEach(function (s) {
         html += '<tr id="eg-slot-row-' + s.id + '">' +
-          '<td>' + esc(s.slot_date) + '</td>' +
+          '<td>' + esc(s.slot_date) +
+            '<div class="eg-slot-actions">' +
+              '<button type="button" class="button eg-edit-slot" data-id="' + s.id + '">Edit</button>' +
+              '<button type="button" class="button eg-delete-slot" data-id="' + s.id + '">Delete</button>' +
+            '</div></td>' +
           '<td>' + esc(s.start_time.slice(0,5)) + '</td>' +
           '<td>' + esc(s.end_time.slice(0,5)) + '</td>' +
           '<td><select class="eg-slot-floor-select" data-id="' + s.id + '" aria-label="Floor">' +
@@ -186,8 +190,6 @@
           '</select>' +
           (/^https?:\/\//i.test(s.image_url || '') ? ' <img class="eg-slot-thumb" src="' + esc(s.image_url) + '" alt="">' : '') +
           '</td>' +
-          '<td><button type="button" class="button eg-edit-slot" data-id="' + s.id + '">Edit</button> ' +
-          '<button class="button eg-delete-slot" data-id="' + s.id + '">Delete</button></td>' +
           '</tr>';
       });
       html += '</tbody></table>';

@@ -368,13 +368,18 @@ class Eggplant_Admin {
           <th><?php esc_html_e( 'Event Notes (admin only)', 'eggplant' ); ?></th>
           <th><?php esc_html_e( 'Status', 'eggplant' ); ?></th>
           <th><?php esc_html_e( 'Event Type', 'eggplant' ); ?></th>
-          <th><?php esc_html_e( 'Actions', 'eggplant' ); ?></th>
         </tr>
       </thead>
       <tbody>
         <?php foreach ( $slots as $slot ) : ?>
         <tr id="eg-slot-row-<?php echo esc_attr( $slot['id'] ); ?>">
-          <td><?php echo esc_html( $slot['slot_date'] ); ?></td>
+          <td>
+            <?php echo esc_html( $slot['slot_date'] ); ?>
+            <div class="eg-slot-actions">
+              <button type="button" class="button eg-edit-slot" data-id="<?php echo esc_attr( $slot['id'] ); ?>"><?php esc_html_e( 'Edit', 'eggplant' ); ?></button>
+              <button type="button" class="button eg-delete-slot" data-id="<?php echo esc_attr( $slot['id'] ); ?>"><?php esc_html_e( 'Delete', 'eggplant' ); ?></button>
+            </div>
+          </td>
           <td><?php echo esc_html( substr( $slot['start_time'], 0, 5 ) ); ?></td>
           <td><?php echo esc_html( substr( $slot['end_time'],   0, 5 ) ); ?></td>
           <td>
@@ -402,10 +407,6 @@ class Eggplant_Admin {
             <?php if ( ! empty( $slot['image_url'] ) ) : ?>
               <img class="eg-slot-thumb" src="<?php echo esc_url( $slot['image_url'] ); ?>" alt="">
             <?php endif; ?>
-          </td>
-          <td>
-            <button type="button" class="button eg-edit-slot" data-id="<?php echo esc_attr( $slot['id'] ); ?>"><?php esc_html_e( 'Edit', 'eggplant' ); ?></button>
-            <button class="button eg-delete-slot" data-id="<?php echo esc_attr( $slot['id'] ); ?>"><?php esc_html_e( 'Delete', 'eggplant' ); ?></button>
           </td>
         </tr>
         <?php endforeach; ?>
