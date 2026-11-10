@@ -92,6 +92,22 @@
 .eg-slots-table select { min-width: 110px; }
 .eg-slot-notes { white-space: pre-wrap; min-width: 180px; max-width: 320px; overflow-wrap: anywhere; }
 .eg-table-wrap { overflow-x: auto; }
+.eg-slots-table th:last-child,
+.eg-slots-table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  background-color: #fff;
+  box-shadow: -1px 0 #c3c4c7;
+  white-space: nowrap;
+}
+.eg-slots-table thead th:last-child {
+  z-index: 2;
+  background-color: #f6f7f7;
+}
+.eg-slots-table tbody tr:nth-child(odd) td:last-child {
+  background-color: #f6f7f7;
+}
 
 /* Bookings table */
 .eg-bookings-table td { vertical-align: top; max-width: 220px; word-wrap: break-word; }
