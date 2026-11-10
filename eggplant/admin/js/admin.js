@@ -51,6 +51,7 @@
         $('#eg-slot-end').val(slot.end_time.slice(0, 5));
         $('#eg-slot-floor').val(slot.floor);
         $('#eg-slot-label').val(slot.label);
+        $('#eg-slot-notes').val(slot.notes || '');
         $('#eg-slot-status').val(slot.status);
         $('#eg-slot-visibility').val(slot.visibility === 'public' ? 'public' : 'private');
         $('#eg-slot-image').val(slot.image_url || '').trigger('change');
@@ -82,6 +83,7 @@
       end_time:   $('#eg-slot-end').val(),
       floor:      $('#eg-slot-floor').val(),
       label:      $('#eg-slot-label').val(),
+      notes:      $('#eg-slot-notes').val(),
       status:     $('#eg-slot-status').val(),
       visibility: $('#eg-slot-visibility').val(),
       image_url:  $('#eg-slot-image').val()
@@ -159,7 +161,7 @@
         return;
       }
       let html = '<table class="widefat striped eg-slots-table"><thead><tr>' +
-        '<th>Date</th><th>Start</th><th>End</th><th>Floor</th><th>Label</th><th>Status</th><th>Event Type</th><th>Actions</th>' +
+        '<th>Date</th><th>Start</th><th>End</th><th>Floor</th><th>Label</th><th>Event Notes (admin only)</th><th>Status</th><th>Event Type</th><th>Actions</th>' +
         '</tr></thead><tbody>';
       res.data.forEach(function (s) {
         html += '<tr id="eg-slot-row-' + s.id + '">' +
@@ -172,6 +174,7 @@
             }).join('') +
           '</select></td>' +
           '<td>' + esc(s.label) + '</td>' +
+          '<td class="eg-slot-notes">' + esc(s.notes || '') + '</td>' +
           '<td><select class="eg-slot-status-select" data-id="' + s.id + '">' +
             opt('available', s.status, 'Available') +
             opt('held',      s.status, 'Hold') +

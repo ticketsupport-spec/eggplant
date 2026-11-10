@@ -298,6 +298,11 @@ class Eggplant_Admin {
             <input type="text" id="eg-slot-label" placeholder="<?php esc_attr_e( 'e.g. Evening Show', 'eggplant' ); ?>">
           </div>
           <div class="eg-form-row">
+            <label for="eg-slot-notes"><?php esc_html_e( 'Event Notes (admin only)', 'eggplant' ); ?></label>
+            <textarea id="eg-slot-notes" rows="4" aria-describedby="eg-slot-notes-help"></textarea>
+          </div>
+          <p class="description" id="eg-slot-notes-help"><?php esc_html_e( 'Save special requests or information for this event. Notes are only visible to administrators, even for public events. Use Edit to update or clear them later.', 'eggplant' ); ?></p>
+          <div class="eg-form-row">
             <label><?php esc_html_e( 'Status', 'eggplant' ); ?></label>
             <select id="eg-slot-status">
               <option value="available"><?php esc_html_e( 'Available', 'eggplant' ); ?></option>
@@ -360,6 +365,7 @@ class Eggplant_Admin {
           <th><?php esc_html_e( 'End', 'eggplant' ); ?></th>
           <th><?php esc_html_e( 'Floor', 'eggplant' ); ?></th>
           <th><?php esc_html_e( 'Label', 'eggplant' ); ?></th>
+          <th><?php esc_html_e( 'Event Notes (admin only)', 'eggplant' ); ?></th>
           <th><?php esc_html_e( 'Status', 'eggplant' ); ?></th>
           <th><?php esc_html_e( 'Event Type', 'eggplant' ); ?></th>
           <th><?php esc_html_e( 'Actions', 'eggplant' ); ?></th>
@@ -379,6 +385,7 @@ class Eggplant_Admin {
             </select>
           </td>
           <td><?php echo esc_html( $slot['label'] ); ?></td>
+          <td class="eg-slot-notes"><?php echo esc_html( $slot['notes'] ?? '' ); ?></td>
           <td>
             <select class="eg-slot-status-select" data-id="<?php echo esc_attr( $slot['id'] ); ?>">
               <option value="available" <?php selected( $slot['status'], 'available' ); ?>><?php esc_html_e( 'Available', 'eggplant' ); ?></option>
@@ -960,6 +967,7 @@ class Eggplant_Admin {
       'end_time'   => $end,
       'floor'      => $floor,
       'label'      => sanitize_text_field( wp_unslash( $_POST['label']      ?? '' ) ),
+      'notes'      => sanitize_textarea_field( wp_unslash( $_POST['notes'] ?? '' ) ),
       'status'     => $status,
       'visibility' => $visibility,
       'image_url'  => esc_url_raw( $image_url ),

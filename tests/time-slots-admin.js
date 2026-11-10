@@ -9,7 +9,7 @@ const handlers = new Map();
 const document = { getElementById: () => ({ scrollIntoView() {} }) };
 let slot = {
   id: '1', slot_date: '2026-11-03', start_time: '18:00:00', end_time: '23:00:00',
-  floor: 'floor_1', label: 'Original', status: 'booked', visibility: 'public', image_url: 'https://example.com/a.jpg'
+  floor: 'floor_1', label: 'Original', notes: 'Original request\nSecond line', status: 'booked', visibility: 'public', image_url: 'https://example.com/a.jpg'
 };
 let calendarRefreshes = 0;
 let failSave = false;
@@ -25,7 +25,7 @@ function $(selector) {
   const element = {
     value: '', content: '', properties: {}, classes: new Set(), dataValues: {},
     0: { reset() {
-      ['id', 'date', 'start', 'end', 'label', 'image'].forEach(key => $('#eg-slot-' + key).val(''));
+      ['id', 'date', 'start', 'end', 'label', 'notes', 'image'].forEach(key => $('#eg-slot-' + key).val(''));
       $('#eg-slot-visibility').val('private');
       $('#eg-slot-floor').val('floor_1');
       $('#eg-slot-status').val('available');
@@ -78,6 +78,7 @@ assert.equal($('#eg-slot-submit').content, 'Save Changes');
 assert.equal($('#eg-slot-cancel').properties.hidden, false);
 assert.equal($('#eg-slot-visibility').val(), 'public');
 assert.equal($('#eg-slot-image').val(), 'https://example.com/a.jpg');
+assert.equal($('#eg-slot-notes').val(), 'Original request\nSecond line');
 assert.equal($('.eg-slot-public-fields').properties.hidden, false, 'Public slots must show the image field.');
 
 $('#eg-slot-date').val('2026-11-10');
@@ -85,10 +86,14 @@ $('#eg-slot-start').val('09:30');
 $('#eg-slot-end').val('12:45');
 $('#eg-slot-floor').val('both');
 $('#eg-slot-label').val('<Updated>');
+$('#eg-slot-notes').val('Special <request> & setup\nSecond line');
 $('#eg-slot-status').val('held');
 $('#eg-slot-image').val('https://example.com/"b".jpg');
 handlers.get('submit:#eg-add-slot-form')({ preventDefault() {} });
 assert.equal(slot.visibility, 'public');
+assert.equal(slot.notes, 'Special <request> & setup\nSecond line');
+assert.equal($('#eg-slot-notes').val(), '', 'Successful saves must reset notes for the next event.');
+assert.match($('#eg-slots-table-wrap').content, /Special &lt;request&gt; &amp; setup\nSecond line/, 'Reloaded notes must be escaped and preserve line breaks.');
 assert.equal(slot.image_url, 'https://example.com/"b".jpg');
 assert.equal($('#eg-slot-visibility').val(), 'private', 'Reset must default to private events.');
 assert.equal($('.eg-slot-public-fields').properties.hidden, true);
@@ -113,10 +118,12 @@ handlers.get('click:.eg-edit-slot').call(editButton);
 failSave = true;
 handlers.get('submit:#eg-add-slot-form')({ preventDefault() {} });
 assert.equal($('#eg-slot-id').val(), '1', 'Failed saves must retain edit state.');
+assert.equal($('#eg-slot-notes').val(), slot.notes, 'Failed saves must retain notes.');
 assert.match($('#eg-add-slot-msg').content, /Update failed/);
 assert.equal(calendarRefreshes, 1, 'Failed saves must not refresh as if saved.');
 handlers.get('click:#eg-slot-cancel')();
 assert.equal($('#eg-slot-id').val(), '');
+assert.equal($('#eg-slot-notes').val(), '', 'Cancel must clear notes.');
 
 failSave = false;
 $('#eg-slot-date').val('2026-11-12');
@@ -124,6 +131,13 @@ $('#eg-slot-start').val('14:00');
 $('#eg-slot-end').val('16:00');
 handlers.get('submit:#eg-add-slot-form')({ preventDefault() {} });
 assert.equal(slot.action, 'eggplant_admin_add_slot', 'Cancel must return the form to adding slots.');
+$('#eg-slot-notes').val('New event request');
+handlers.get('submit:#eg-add-slot-form')({ preventDefault() {} });
+assert.equal(slot.notes, 'New event request', 'Adding a slot must submit notes.');
+handlers.get('click:.eg-edit-slot').call(editButton);
+$('#eg-slot-notes').val('');
+handlers.get('submit:#eg-add-slot-form')({ preventDefault() {} });
+assert.equal(slot.notes, '', 'Saving empty notes must clear them.');
 const visSelect = $('vis-select');
 visSelect.dataValues.id = '1';
 visSelect.classes.add('eg-slot-visibility-select');
@@ -132,5 +146,5 @@ handlers.get('change:.eg-slot-status-select, .eg-slot-floor-select, .eg-slot-vis
 assert.equal(slot.visibility, 'private', 'Inline event type changes must be saved.');
 handlers.get('click:.eg-delete-slot').call(editButton);
 assert.equal(slot, null);
-assert.equal(calendarRefreshes, 4);
+assert.equal(calendarRefreshes, 6);
 console.log('Time-slot admin interactions passed.');

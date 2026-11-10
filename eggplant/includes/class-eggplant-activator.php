@@ -55,6 +55,7 @@ class Eggplant_Activator {
       end_time    TIME NOT NULL,
       floor       VARCHAR(20) NOT NULL DEFAULT 'both',
       label       VARCHAR(200) DEFAULT '',
+      notes       TEXT,
       status      ENUM('available','booked','held') NOT NULL DEFAULT 'available',
       visibility  VARCHAR(10) NOT NULL DEFAULT 'private',
       image_url   TEXT,
@@ -421,6 +422,7 @@ class Eggplant_Activator {
     self::ensure_column( 'eggplant_time_slots', 'floor', "VARCHAR(20) NOT NULL DEFAULT 'both'" );
     self::ensure_column( 'eggplant_time_slots', 'visibility', "VARCHAR(10) NOT NULL DEFAULT 'private'" );
     self::ensure_column( 'eggplant_time_slots', 'image_url', 'TEXT' );
+    self::ensure_column( 'eggplant_time_slots', 'notes', 'TEXT' );
     dbDelta( $sql_tasks );
     if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $wpdb->last_error ) ) {
       error_log( 'Eggplant dbDelta error (eggplant_tasks): ' . $wpdb->last_error );

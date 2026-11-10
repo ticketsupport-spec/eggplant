@@ -14,7 +14,7 @@ class Eggplant_DB {
   /**
    * Insert a time slot.
    *
-   * @param array<string,mixed> $data  Keys: slot_date, start_time, end_time, floor, label, status, visibility, image_url
+   * @param array<string,mixed> $data  Keys: slot_date, start_time, end_time, floor, label, notes, status, visibility, image_url
    * @return int|false  Inserted row ID or false on failure.
    */
   public static function insert_slot( array $data ) {
@@ -30,12 +30,13 @@ class Eggplant_DB {
         'end_time'   => sanitize_text_field( $data['end_time']   ?? '' ),
         'floor'      => $data['floor'] ?? 'both',
         'label'      => sanitize_text_field( $data['label']      ?? '' ),
+        'notes'      => sanitize_textarea_field( $data['notes'] ?? '' ),
         'status'     => in_array( $data['status'] ?? 'available', array( 'available', 'booked', 'held' ), true )
                         ? $data['status'] : 'available',
         'visibility' => 'public' === ( $data['visibility'] ?? '' ) ? 'public' : 'private',
         'image_url'  => esc_url_raw( $data['image_url'] ?? '' ),
       ),
-      array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
+      array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
     );
     return $result ? $wpdb->insert_id : false;
   }
