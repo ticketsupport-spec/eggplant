@@ -90,6 +90,7 @@
 
 /* Slots table */
 .eg-slots-table select { min-width: 110px; }
+.eg-slot-notes { white-space: pre-wrap; min-width: 180px; max-width: 320px; overflow-wrap: anywhere; }
 .eg-table-wrap { overflow-x: auto; }
 
 /* Bookings table */

@@ -7,6 +7,7 @@ define( 'ARRAY_A', 'ARRAY_A' );
 
 function __( $text, $domain = '' ) { return $text; }
 function sanitize_text_field( $text ) { return trim( strip_tags( $text ) ); }
+function sanitize_textarea_field( $text ) { return trim( strip_tags( $text ) ); }
 function sanitize_key( $text ) { return preg_replace( '/[^a-z0-9_-]/', '', strtolower( $text ) ); }
 function wp_unslash( $value ) { return $value; }
 function wp_kses_post( $value ) { return $value; }
@@ -19,8 +20,9 @@ function esc_html_e( $text, $domain = '' ) { echo esc_html( $text ); }
 function esc_attr_e( $text, $domain = '' ) { echo esc_attr( $text ); }
 function selected( $value, $expected ) { if ( $value === $expected ) echo ' selected'; }
 function add_action( ...$args ) {}
+function add_filter( ...$args ) {}
 function check_ajax_referer( ...$args ) {}
-function current_user_can( $capability ) { return true; }
+function current_user_can( $capability ) { return $GLOBALS['slot_test_is_admin'] ?? true; }
 
 class Eggplant_Settings {
   public static function get_all(): array {
@@ -79,6 +81,7 @@ class Slot_Test_DB {
   }
 
   public function query( string $sql ) { return $this->pdo->exec( $sql ); }
+  public function esc_like( string $value ): string { return addcslashes( $value, '_%\\' ); }
 
   public function insert( string $table, array $data, array $formats ) {
     $sql = 'INSERT INTO ' . $table . ' (' . implode( ',', array_keys( $data ) ) . ') VALUES ('
@@ -108,6 +111,7 @@ require_once __DIR__ . '/../eggplant/includes/class-eggplant-db.php';
 require_once __DIR__ . '/../eggplant/includes/class-eggplant-admin.php';
 require_once __DIR__ . '/../eggplant/includes/class-eggplant-floor-calendar.php';
 require_once __DIR__ . '/../eggplant/includes/class-eggplant-activator.php';
+require_once __DIR__ . '/../eggplant/includes/class-eggplant-frontend.php';
 
 function expect( bool $condition, string $message ): void {
   if ( ! $condition ) throw new RuntimeException( $message );
@@ -137,8 +141,11 @@ $migration->invoke( null, 'eggplant_time_slots', 'floor', "VARCHAR(20) NOT NULL 
 $migration->invoke( null, 'eggplant_time_slots', 'floor', "VARCHAR(20) NOT NULL DEFAULT 'both'" );
 $migration->invoke( null, 'eggplant_time_slots', 'visibility', "VARCHAR(10) NOT NULL DEFAULT 'private'" );
 $migration->invoke( null, 'eggplant_time_slots', 'image_url', 'TEXT' );
+$migration->invoke( null, 'eggplant_time_slots', 'notes', 'TEXT' );
+$migration->invoke( null, 'eggplant_time_slots', 'notes', 'TEXT' );
 expect( 'both' === Eggplant_DB::get_slot( 1 )['floor'], 'Upgrade must preserve existing slots and default to both floors.' );
 expect( 'private' === Eggplant_DB::get_slot( 1 )['visibility'], 'Upgraded slots must default to private events.' );
+expect( empty( Eggplant_DB::get_slot( 1 )['notes'] ), 'Upgraded slots must start with empty notes.' );
 $wpdb->query( "CREATE TABLE wp_eggplant_floor_days (
   id INTEGER PRIMARY KEY AUTOINCREMENT, day_date TEXT, floor TEXT, status TEXT, visibility TEXT,
   title TEXT, description TEXT, start_time TEXT, end_time TEXT, image_url TEXT, link_url TEXT,
@@ -149,10 +156,12 @@ $admin = new Eggplant_Admin();
 $slot = array(
   'slot_date' => '2026-11-04', 'start_time' => '18:30', 'end_time' => '23:30',
   'floor' => 'floor_1', 'status' => 'booked', 'label' => 'Client booking',
+  'notes' => "Wheelchair access requested.\n<b>Use side entrance.</b>",
 );
 $result = request( $admin, 'ajax_add_slot', $slot );
 expect( $result->success, 'Adding a slot should succeed.' );
 $id = $result->data['id'];
+expect( "Wheelchair access requested.\nUse side entrance." === Eggplant_DB::get_slot( $id )['notes'], 'Notes must be sanitized and preserve line breaks.' );
 expect( '18:30' === Eggplant_DB::get_slot( $id )['start_time'], 'Start time must be retained.' );
 expect( ! Eggplant_Floor_Calendar::is_available( '2026-11-04', 'floor_1' ), 'Booked main floor must be unavailable.' );
 expect( Eggplant_Floor_Calendar::is_available( '2026-11-04', 'floor_2' ), 'Other floor must stay available.' );
@@ -163,17 +172,20 @@ expect( isset( $public['2026-11-03']['floor_1'], $public['2026-11-03']['floor_2'
 $edited = array_merge( $slot, array(
   'id' => $id, 'slot_date' => '2026-11-05', 'start_time' => '09:00', 'end_time' => '12:00',
   'floor' => 'floor_2', 'label' => 'Updated', 'status' => 'held',
+  'notes' => "Updated special request.\nArrange seating.",
 ) );
 expect( request( $admin, 'ajax_update_slot', $edited )->success, 'Full editing should succeed.' );
 $loaded = request( $admin, 'ajax_get_slots', array(), array( 'id' => $id ) );
 expect( $loaded->success && 'Updated' === $loaded->data['label'] && '09:00' === $loaded->data['start_time']
   && '12:00' === $loaded->data['end_time'], 'Edit must persist all fields and be loadable.' );
+expect( $edited['notes'] === $loaded->data['notes'], 'Edited notes must persist and load in the editor.' );
 $public = Eggplant_Floor_Calendar::get_public_month( '2026-11' );
 expect( ! isset( $public['2026-11-04'] ), 'Moving a slot must free its old date/floor.' );
 expect( array( 'status' => 'blocked' ) === $public['2026-11-05']['floor_2'], 'Holds must show as unavailable.' );
 expect( false === Eggplant_Floor_Calendar::save_day( '2026-11-05', 'floor_2', array(), true ), 'Approvals must not claim a floor occupied by a slot.' );
 expect( request( $admin, 'ajax_update_slot', array( 'id' => $id, 'floor' => 'both' ) )->success, 'Inline floor editing should succeed.' );
 expect( request( $admin, 'ajax_update_slot', array( 'id' => $id, 'status' => 'booked' ) )->success, 'Inline status editing should succeed.' );
+expect( $edited['notes'] === Eggplant_DB::get_slot( $id )['notes'], 'Inline edits must not clear notes.' );
 expect( ! Eggplant_Floor_Calendar::is_available( '2026-11-05', 'floor_1' ), 'Both floor choice must occupy the main floor too.' );
 $calendar = new Eggplant_Floor_Calendar();
 $month = request( $calendar, 'ajax_get_month', array( 'month' => '2026-11' ) );
@@ -187,6 +199,7 @@ ob_start();
 $admin->page_slots();
 $html = ob_get_clean();
 expect( false !== strpos( $html, 'eg-edit-slot' ) && false !== strpos( $html, 'eg-slot-cancel' ), 'Slots page must render editing controls.' );
+expect( false !== strpos( $html, 'id="eg-slot-notes"' ) && false !== strpos( $html, $edited['notes'] ), 'Slots page must render the notes editor and saved multiline notes.' );
 expect( false !== strpos( $html, 'Top Floor' ) && false !== strpos( $html, 'Both Floors' ), 'Floor choices must use configured names.' );
 expect( false !== strpos( $html, 'id="eg-fc-grid"' ) && false === strpos( $html, 'id="eg-fc-editor"' ), 'Slots page must include a read-only calendar without a duplicate editor.' );
 
@@ -222,12 +235,30 @@ expect( ! request( $admin, 'ajax_update_slot', array_merge( $edited, array( 'id'
 $public_slot = array_merge( $slot, array(
   'slot_date' => '2026-11-20', 'floor' => 'both', 'label' => 'Jazz Night', 'status' => 'booked',
   'visibility' => 'public', 'image_url' => 'https://example.com/jazz.jpg',
+  'notes' => "ADMIN-ONLY-REQUEST\nBring <chairs> & tables.",
 ) );
 $created = request( $admin, 'ajax_add_slot', $public_slot );
 expect( $created->success, 'Adding a public slot should succeed.' );
 $public_id = $created->data['id'];
 $stored = Eggplant_DB::get_slot( $public_id );
 expect( 'public' === $stored['visibility'] && 'https://example.com/jazz.jpg' === $stored['image_url'], 'Event type and image must persist.' );
+expect( "ADMIN-ONLY-REQUEST\nBring  & tables." === $stored['notes'], 'Public events must also retain sanitized admin notes.' );
+$frontend = new Eggplant_Frontend();
+foreach ( array( 'public', 'private' ) as $visibility ) {
+  Eggplant_DB::update_slot_visibility( $public_id, $visibility );
+  $response = request( $frontend, 'ajax_get_calendar', array(), array( 'month' => '2026-11' ) );
+  $json = json_encode( $response->data );
+  expect( $response->success && false === strpos( $json, 'ADMIN-ONLY-REQUEST' )
+    && false === strpos( $json, '"notes"' ), 'The complete public calendar response must never include admin notes, regardless of event type.' );
+}
+Eggplant_DB::update_slot_visibility( $public_id, 'public' );
+$slot_test_is_admin = false;
+foreach ( array( 'ajax_get_slots', 'ajax_add_slot', 'ajax_update_slot' ) as $method ) {
+  expect( ! request( $admin, $method, array_merge( $public_slot, array( 'id' => $public_id, 'notes' => 'Unauthorized change' ) ), array( 'id' => $public_id ) )->success,
+    'Non-administrators must not read or write event notes.' );
+}
+$slot_test_is_admin = true;
+expect( $stored['notes'] === Eggplant_DB::get_slot( $public_id )['notes'], 'Unauthorized edits must not change notes.' );
 $public = Eggplant_Floor_Calendar::get_public_month( '2026-11' );
 foreach ( array( 'floor_1', 'floor_2' ) as $floor ) {
   $day = $public['2026-11-20'][ $floor ];
@@ -254,4 +285,11 @@ $html = ob_get_clean();
 expect( false !== strpos( $html, 'id="eg-slot-visibility"' ) && false !== strpos( $html, 'eg-media-pick' )
   && false !== strpos( $html, 'eg-slot-visibility-select' ) && false !== strpos( $html, 'class="eg-slot-thumb" src="https://example.com/jazz.jpg"' ), 'Slots page must render event type and image upload controls.' );
 expect( ! request( $admin, 'ajax_get_slots', array(), array( 'id' => 999 ) )->success, 'Loading a missing slot must fail.' );
+Eggplant_DB::update_slot( $public_id, array( 'notes' => "Bring <chairs> & tables.\nSecond line." ) );
+ob_start();
+$admin->page_slots();
+$html = ob_get_clean();
+expect( false !== strpos( $html, "Bring &lt;chairs&gt; &amp; tables.\nSecond line." ), 'Saved notes must be HTML-escaped in the admin list.' );
+expect( request( $admin, 'ajax_update_slot', array_merge( $edited_public, array( 'notes' => '' ) ) )->success, 'Administrators must be able to clear notes.' );
+expect( '' === Eggplant_DB::get_slot( $public_id )['notes'], 'Cleared notes must remain empty when reloaded.' );
 echo "Time-slot regressions passed.\n";
