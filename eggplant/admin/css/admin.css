@@ -102,6 +102,13 @@
 
 /* Bookings table */
 .eg-bookings-table td { vertical-align: top; max-width: 220px; word-wrap: break-word; }
+.eg-bookings-table .eg-booking-row--new td { background-color: #fff1f0 !important; }
+.eg-booking-reply-form { min-width: 220px; }
+.eg-booking-reply-form input,
+.eg-booking-reply-form textarea { display: block; width: 100%; margin-bottom: .4rem; }
+.eg-booking-reply-result { display: block; margin-top: .35rem; }
+.eg-booking-reply-result--success { color: #1e6b34; }
+.eg-booking-reply-result--error { color: #b42318; }
 
 /* Color text inputs */
 .eg-color-text { width: 90px !important; font-family: monospace; }
