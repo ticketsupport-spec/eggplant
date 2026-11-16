@@ -295,13 +295,43 @@
     $.post(ajaxUrl, { action: 'eggplant_admin_update_booking', nonce: nonce, id: id, status: status })
       .done(function (res) {
         if (res.success) {
-          $this.closest('tr').find('td:first').css('border-left', '3px solid ' +
+          const row = $this.closest('tr');
+          row.toggleClass('eg-booking-row--new', status === 'new');
+          row.find('td:first').css('border-left', '3px solid ' +
             ({ new: '#d63638', reviewed: '#f0ad00', approved: '#46b450', declined: '#999' }[status] || '#999'));
           if (res.data && res.data.floor_message) alert(res.data.floor_message);
         } else {
           alert('Could not update status.');
         }
       });
+  });
+
+  $(document).on('submit', '.eg-booking-reply-form', function (e) {
+    e.preventDefault();
+    const form = $(this);
+    const result = form.find('.eg-booking-reply-result');
+    const button = form.find('button[type="submit"]');
+    result.removeClass('eg-booking-reply-result--success eg-booking-reply-result--error').text('Sending…');
+    button.prop('disabled', true);
+
+    $.post(ajaxUrl, {
+      action: 'eggplant_admin_reply_booking',
+      nonce: nonce,
+      id: form.data('id'),
+      subject: form.find('.eg-booking-reply-subject').val(),
+      message: form.find('.eg-booking-reply-message').val()
+    }).done(function (res) {
+      if (res.success) {
+        result.addClass('eg-booking-reply-result--success').text(res.data || 'Reply sent.');
+        form.find('.eg-booking-reply-message').val('');
+      } else {
+        result.addClass('eg-booking-reply-result--error').text(res.data || 'Could not send reply.');
+      }
+    }).fail(function () {
+      result.addClass('eg-booking-reply-result--error').text('Could not send reply. Network error.');
+    }).always(function () {
+      button.prop('disabled', false);
+    });
   });
 
   /* ================================================================

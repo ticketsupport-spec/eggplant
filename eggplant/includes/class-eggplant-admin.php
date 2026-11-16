@@ -24,6 +24,7 @@ class Eggplant_Admin {
     add_action( 'wp_ajax_eggplant_admin_get_event',    array( $this, 'ajax_get_event' ) );
 
     add_action( 'wp_ajax_eggplant_admin_update_booking', array( $this, 'ajax_update_booking' ) );
+    add_action( 'wp_ajax_eggplant_admin_reply_booking',  array( $this, 'ajax_reply_booking' ) );
   }
 
   // ------------------------------------------------------------------ menus
@@ -540,11 +541,12 @@ class Eggplant_Admin {
             <th><?php esc_html_e( 'Time Slot', 'eggplant' ); ?></th>
             <th><?php esc_html_e( 'Message', 'eggplant' ); ?></th>
             <th><?php esc_html_e( 'Status', 'eggplant' ); ?></th>
+            <th><?php esc_html_e( 'Reply', 'eggplant' ); ?></th>
           </tr>
         </thead>
         <tbody>
           <?php foreach ( $bookings as $booking ) : ?>
-          <tr id="eg-booking-row-<?php echo esc_attr( $booking['id'] ); ?>">
+          <tr id="eg-booking-row-<?php echo esc_attr( $booking['id'] ); ?>" class="<?php echo 'new' === $booking['status'] ? 'eg-booking-row--new' : ''; ?>">
             <td><?php echo esc_html( $booking['created_at'] ); ?></td>
             <td><?php echo esc_html( $booking['name'] ); ?></td>
             <td><a href="mailto:<?php echo esc_attr( $booking['email'] ); ?>"><?php echo esc_html( $booking['email'] ); ?></a></td>
@@ -568,6 +570,14 @@ class Eggplant_Admin {
                 <option value="approved" <?php selected( $booking['status'], 'approved' ); ?>><?php esc_html_e( 'Approved', 'eggplant' ); ?></option>
                 <option value="declined" <?php selected( $booking['status'], 'declined' ); ?>><?php esc_html_e( 'Declined', 'eggplant' ); ?></option>
               </select>
+            </td>
+            <td>
+              <form class="eg-booking-reply-form" data-id="<?php echo esc_attr( $booking['id'] ); ?>">
+                <input type="text" class="eg-booking-reply-subject" value="<?php echo esc_attr( sprintf( __( 'Re: Your booking request for %s', 'eggplant' ), $booking['event_date'] ) ); ?>" aria-label="<?php esc_attr_e( 'Email subject', 'eggplant' ); ?>">
+                <textarea class="eg-booking-reply-message" rows="3" required aria-label="<?php esc_attr_e( 'Reply message', 'eggplant' ); ?>"></textarea>
+                <button type="submit" class="button"><?php esc_html_e( 'Send Reply', 'eggplant' ); ?></button>
+                <span class="eg-booking-reply-result" role="status" aria-live="polite"></span>
+              </form>
             </td>
           </tr>
           <?php endforeach; ?>
@@ -1081,6 +1091,37 @@ class Eggplant_Admin {
       wp_send_json_error( 'Update failed.' );
     }
     wp_send_json_success( array( 'floor_message' => $this->sync_booking_floor( $id, $status ) ) );
+  }
+
+  public function ajax_reply_booking(): void {
+    check_ajax_referer( 'eggplant_admin_nonce', 'nonce' );
+    if ( ! current_user_can( 'manage_options' ) ) {
+      wp_send_json_error( 'Unauthorized' );
+    }
+
+    $id      = absint( $_POST['id'] ?? 0 );
+    $subject = sanitize_text_field( wp_unslash( $_POST['subject'] ?? '' ) );
+    $message = sanitize_textarea_field( wp_unslash( $_POST['message'] ?? '' ) );
+    $booking = Eggplant_DB::get_booking( $id );
+
+    if ( ! $booking || ! is_email( $booking['email'] ) ) {
+      wp_send_json_error( __( 'Could not find a valid email address for this booking.', 'eggplant' ) );
+    }
+    if ( '' === $subject || '' === $message ) {
+      wp_send_json_error( __( 'Please provide an email subject and message.', 'eggplant' ) );
+    }
+
+    $headers     = array();
+    $admin_email = Eggplant_Settings::get( 'contact_email', get_option( 'admin_email' ) );
+    if ( is_email( $admin_email ) ) {
+      $headers[] = 'Reply-To: ' . $admin_email;
+    }
+
+    if ( ! wp_mail( $booking['email'], $subject, $message, $headers ) ) {
+      wp_send_json_error( __( 'The reply could not be sent. Please check your site email configuration and try again.', 'eggplant' ) );
+    }
+
+    wp_send_json_success( __( 'Reply sent.', 'eggplant' ) );
   }
 
   /**
