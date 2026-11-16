@@ -110,6 +110,67 @@
 .eg-booking-reply-result--success { color: #1e6b34; }
 .eg-booking-reply-result--error { color: #b42318; }
 
+@media (max-width: 782px) {
+  .eg-bookings-table,
+  .eg-bookings-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .eg-bookings-table thead {
+    display: none;
+  }
+
+  .eg-bookings-table tr {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid #c3c4c7;
+    border-radius: 6px;
+    background: #fff;
+    overflow: hidden;
+  }
+
+  .eg-bookings-table td,
+  .eg-bookings-table .eg-booking-row--new td {
+    display: grid;
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    gap: .75rem;
+    align-items: start;
+    max-width: none;
+    padding: .75rem;
+    border-bottom: 1px solid #f0f0f1;
+    background: transparent !important;
+  }
+
+  .eg-bookings-table .eg-booking-row--new {
+    background: #fff1f0;
+  }
+
+  .eg-bookings-table td:last-child {
+    border-bottom: 0;
+  }
+
+  .eg-bookings-table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+  }
+
+  .eg-bookings-table td a {
+    overflow-wrap: anywhere;
+  }
+
+  .eg-bookings-table .eg-booking-status-select,
+  .eg-booking-reply-form {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .eg-booking-reply-form input,
+  .eg-booking-reply-form textarea {
+    box-sizing: border-box;
+  }
+}
+
 /* Color text inputs */
 .eg-color-text { width: 90px !important; font-family: monospace; }
 

@@ -547,14 +547,14 @@ class Eggplant_Admin {
         <tbody>
           <?php foreach ( $bookings as $booking ) : ?>
           <tr id="eg-booking-row-<?php echo esc_attr( $booking['id'] ); ?>" class="<?php echo 'new' === $booking['status'] ? 'eg-booking-row--new' : ''; ?>">
-            <td><?php echo esc_html( $booking['created_at'] ); ?></td>
-            <td><?php echo esc_html( $booking['name'] ); ?></td>
-            <td><a href="mailto:<?php echo esc_attr( $booking['email'] ); ?>"><?php echo esc_html( $booking['email'] ); ?></a></td>
-            <td><?php echo esc_html( $booking['phone'] ); ?></td>
-            <td><?php echo esc_html( $booking['event_type'] ); ?></td>
-            <td><?php echo esc_html( $booking['event_date'] ); ?></td>
-            <td><?php echo esc_html( $floor_names[ $booking['floor'] ?? '' ] ?? '' ); ?></td>
-            <td><?php
+            <td data-label="<?php esc_attr_e( 'Date Submitted', 'eggplant' ); ?>"><?php echo esc_html( $booking['created_at'] ); ?></td>
+            <td data-label="<?php esc_attr_e( 'Name', 'eggplant' ); ?>"><?php echo esc_html( $booking['name'] ); ?></td>
+            <td data-label="<?php esc_attr_e( 'Email', 'eggplant' ); ?>"><a href="mailto:<?php echo esc_attr( $booking['email'] ); ?>"><?php echo esc_html( $booking['email'] ); ?></a></td>
+            <td data-label="<?php esc_attr_e( 'Phone', 'eggplant' ); ?>"><?php echo esc_html( $booking['phone'] ); ?></td>
+            <td data-label="<?php esc_attr_e( 'Event Type', 'eggplant' ); ?>"><?php echo esc_html( $booking['event_type'] ); ?></td>
+            <td data-label="<?php esc_attr_e( 'Requested Date', 'eggplant' ); ?>"><?php echo esc_html( $booking['event_date'] ); ?></td>
+            <td data-label="<?php esc_attr_e( 'Floor', 'eggplant' ); ?>"><?php echo esc_html( $floor_names[ $booking['floor'] ?? '' ] ?? '' ); ?></td>
+            <td data-label="<?php esc_attr_e( 'Time Slot', 'eggplant' ); ?>"><?php
               if ( $booking['start_time'] ) {
                 echo esc_html( substr( $booking['start_time'], 0, 5 ) . ' – ' . substr( $booking['end_time'], 0, 5 ) );
                 if ( $booking['slot_label'] ) {
@@ -562,8 +562,8 @@ class Eggplant_Admin {
                 }
               }
             ?></td>
-            <td><?php echo esc_html( $booking['message'] ); ?></td>
-            <td>
+            <td data-label="<?php esc_attr_e( 'Message', 'eggplant' ); ?>"><?php echo esc_html( $booking['message'] ); ?></td>
+            <td data-label="<?php esc_attr_e( 'Status', 'eggplant' ); ?>">
               <select class="eg-booking-status-select" data-id="<?php echo esc_attr( $booking['id'] ); ?>">
                 <option value="new"      <?php selected( $booking['status'], 'new' );      ?>><?php esc_html_e( 'New',      'eggplant' ); ?></option>
                 <option value="reviewed" <?php selected( $booking['status'], 'reviewed' ); ?>><?php esc_html_e( 'Reviewed', 'eggplant' ); ?></option>
@@ -571,7 +571,7 @@ class Eggplant_Admin {
                 <option value="declined" <?php selected( $booking['status'], 'declined' ); ?>><?php esc_html_e( 'Declined', 'eggplant' ); ?></option>
               </select>
             </td>
-            <td>
+            <td data-label="<?php esc_attr_e( 'Reply', 'eggplant' ); ?>">
               <form class="eg-booking-reply-form" data-id="<?php echo esc_attr( $booking['id'] ); ?>">
                 <input type="text" class="eg-booking-reply-subject" value="<?php echo esc_attr( sprintf( __( 'Re: Your booking request for %s', 'eggplant' ), $booking['event_date'] ) ); ?>" aria-label="<?php esc_attr_e( 'Email subject', 'eggplant' ); ?>">
                 <textarea class="eg-booking-reply-message" rows="3" required aria-label="<?php esc_attr_e( 'Reply message', 'eggplant' ); ?>"></textarea>
