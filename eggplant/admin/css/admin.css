@@ -268,3 +268,50 @@ button.eg-fc-floor:focus { filter: brightness(1.12); outline: 2px solid #1d2327;
   .eg-fc-floor__name,
   .eg-fc-floor__title { display: none; }
 }
+
+@media (max-width: 782px) {
+  .eg-bookings-table,
+  .eg-bookings-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .eg-bookings-table thead { display: none; }
+
+  .eg-bookings-table tr {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid #c3c4c7;
+    background: #fff;
+  }
+
+  .eg-bookings-table td {
+    display: grid;
+    grid-template-columns: minmax(6.5rem, 32%) minmax(0, 1fr);
+    gap: .5rem;
+    max-width: none;
+    padding: .65rem;
+    overflow-wrap: anywhere;
+  }
+
+  .eg-bookings-table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+  }
+
+  .eg-bookings-table td:last-child {
+    display: block;
+  }
+
+  .eg-bookings-table .eg-booking-reply-form { min-width: 0; }
+
+  .eg-bookings-table select,
+  .eg-bookings-table input,
+  .eg-bookings-table textarea {
+    box-sizing: border-box;
+    max-width: 100%;
+    font-size: 16px;
+  }
+
+  .eg-bookings-table .button { min-height: 40px; }
+}
